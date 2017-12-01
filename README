@@ -16,7 +16,11 @@ Operations" by John R. Gilbert and Tim Peierls.
   journal = {{SIAM} Journal on Scientific and Statistical Computing}
 }
 
-This is a Go translation of the version distributed in the ILU package on
-Netlib:
+This package is translated from the gp FORTRAN code distributed in
+Sivan Toledo's work on incomplete-factorization, from PARC in the early
+1990s, as found in the ILU package on Netlib:
 
 http://www.netlib.org/linalg/ilu.tgz
+
+This source code is distributed, with the kind permission of John Gilbert
+and Tim Peierls, under a 3-clause BSD license.
