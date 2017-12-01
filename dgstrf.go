@@ -1,3 +1,6 @@
+// Copyright 1988 John Gilbert and Tim Peierls
+// All rights reserved.
+
 package lufact
 
 import (
@@ -6,100 +9,100 @@ import (
 	"strings"
 )
 
-type desc struct {
+type Desc struct {
 	m, n, nnz      int
 	base           int
 	rowind, colptr []int
 }
 
-type gp_t struct {
-	pivot_policy    int // 0=none, 1=partial, 2=threshold
-	pivot_threshold float64
-	drop_threshold  float64
-	col_fill_ratio  float64
-	fill_ratio      float64
-	expand_ratio    float64
-	col_perm        []int
-	col_perm_base   int
+type GP struct {
+	PivotPolicy    int // 0=none, 1=partial, 2=threshold
+	PivotThreshold float64
+	DropThreshold  float64
+	ColFillRatio   float64
+	FillRatio      float64
+	ExpandRatio    float64
+	ColPerm        []int
+	ColPermBase    int
 
-	user_col_perm      []int
-	user_col_perm_base int
+	UserColPerm     []int
+	UserColPermBase int
 }
 
-func NewGP() *gp_t {
-	return &gp_t{
-		pivot_policy:    1,
-		pivot_threshold: 1,
-		drop_threshold:  0,
-		col_fill_ratio:  -1,
-		fill_ratio:      4,
-		expand_ratio:    1.2,
-		col_perm:        nil,
-		col_perm_base:   0,
+func NewGP() *GP {
+	return &GP{
+		PivotPolicy:    1,
+		PivotThreshold: 1,
+		DropThreshold:  0,
+		ColFillRatio:   -1,
+		FillRatio:      4,
+		ExpandRatio:    1.2,
+		ColPerm:        nil,
+		ColPermBase:    0,
 	}
 }
 
-type lu_t struct {
-	lu_size   int
-	lu_nz     []float64
-	lu_rowind []int
-	l_colptr  []int
-	u_colptr  []int
+type LU struct {
+	luSize   int
+	luNZ     []float64
+	luRowInd []int
+	lColPtr  []int
+	uColPtr  []int
 
-	row_perm []int
-	col_perm []int
+	rowPerm []int
+	colPerm []int
 }
 
-func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, error) {
-	//var lu *lu_t
+func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
+	//var lu *LU
 
-	var pivt_row, orig_row, this_col, othr_col int
+	var pivtRow, origRow, thisCol, othrCol int
 
 	// Extract data from gp object.
 	if gp == nil {
 		return nil, fmt.Errorf("gp must not be nil")
 	}
 
-	pivot_policy := gp.pivot_policy
-	pivot_threshold := gp.pivot_threshold
-	drop_threshold := gp.drop_threshold
-	col_fill_ratio := gp.col_fill_ratio
-	fill_ratio := gp.fill_ratio
-	expand_ratio := gp.expand_ratio
-	user_col_perm := gp.user_col_perm
-	user_col_perm_base := gp.user_col_perm_base
+	pivotPolicy := gp.PivotPolicy
+	pivotThreshold := gp.PivotThreshold
+	dropThreshold := gp.DropThreshold
+	colFillRatio := gp.ColFillRatio
+	fillRatio := gp.FillRatio
+	expandRatio := gp.ExpandRatio
+	userColPerm := gp.UserColPerm
+	userColPermBase := gp.UserColPermBase
 
-	fmt.Printf("piv pol=%d piv_thr=%v drop_thr=%v col_fill_rt=%v\n", pivot_policy, pivot_threshold, drop_threshold, col_fill_ratio)
+	fmt.Printf("piv pol=%d piv_thr=%v drop_thr=%v col_fill_rt=%v\n", pivotPolicy, pivotThreshold, dropThreshold, colFillRatio)
 
-	//pivot_threshold = 0.001
-	//if pivot_threshold == 0.0 { pivot_policy = 0 } // no pivoting
-	//pivot_policy = 0 // no pivoting
+	//PivotThreshold = 0.001
+	//if PivotThreshold == 0.0 { PivotPolicy = 0 } // no pivoting
+	//PivotPolicy = 0 // no pivoting
 
 	// If a column permutation is specified, it must be a length ncol permutation.
-	if gp.user_col_perm != nil && len(gp.user_col_perm) != ncol {
+	if gp.UserColPerm != nil && len(gp.UserColPerm) != ncol {
 		//*info = -1
 		//goto free_and_exit
-		return nil, fmt.Errorf("column permutation (%v) must be a length ncol %v", len(gp.user_col_perm), ncol)
+		return nil, fmt.Errorf("column permutation (%v) must be a length ncol %v", len(gp.UserColPerm), ncol)
 	}
 
 	// Extract data from a's array descriptor.
-	//a_m := desc_a.m
-	a_n := desc_a.n
-	a_nnz := desc_a.nnz
-	a_base := desc_a.base
-	a_colptr := desc_a.colptr
-	a_rowind := desc_a.rowind
+	//a_m := descA.m
+	nA := descA.n
+	nnzA := descA.nnz
+	baseA := descA.base
+	colptrA := descA.colptr
+	rowindA := descA.rowind
 
 	// Convert the descriptor to 1-base if necessary.
-	if a_base == 0 {
-		for jcol := 0; jcol < a_n+1; jcol++ {
-			a_colptr[jcol]++
+	if baseA == 0 {
+		for jcol := 0; jcol < nA+1; jcol++ {
+			colptrA[jcol]++
 		}
-		for jcol := 0; jcol < a_nnz; jcol++ {
-			a_rowind[jcol]++
+		for jcol := 0; jcol < nnzA; jcol++ {
+			rowindA[jcol]++
 		}
-		desc_a.base = 1
-		a_base = 1
+		descA.base = 1
+		baseA = 1
 	}
 
 	// Allocate work arrays.
@@ -111,15 +114,15 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 	pattern := make([]int, nrow)
 
 	// Create lu structure.
-	lu_size := int(float64(a_nnz) * fill_ratio)
-	lu := &lu_t{
-		lu_size:   lu_size,
-		lu_nz:     make([]float64, lu_size),
-		lu_rowind: make([]int, lu_size),
-		u_colptr:  make([]int, ncol+1),
-		l_colptr:  make([]int, ncol),
-		row_perm:  make([]int, nrow),
-		col_perm:  make([]int, ncol),
+	luSize := int(float64(nnzA) * fillRatio)
+	lu := &LU{
+		luSize:   luSize,
+		luNZ:     make([]float64, luSize),
+		luRowInd: make([]int, luSize),
+		uColPtr:  make([]int, ncol+1),
+		lColPtr:  make([]int, ncol),
+		rowPerm:  make([]int, nrow),
+		colPerm:  make([]int, ncol),
 	}
 
 	// Compute max matching. We use elements of the lu structure
@@ -127,8 +130,8 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 	cmatch := make([]int, ncol)
 	rmatch := make([]int, nrow)
 
-	err := maxmatch(nrow, ncol, a_colptr, a_rowind, lu.l_colptr, lu.u_colptr,
-		lu.row_perm, lu.col_perm, lu.lu_rowind, rmatch, cmatch)
+	err := maxmatch(nrow, ncol, colptrA, rowindA, lu.lColPtr, lu.uColPtr,
+		lu.rowPerm, lu.colPerm, lu.luRowInd, rmatch, cmatch)
 	if err != nil {
 		return nil, err
 	}
@@ -149,22 +152,22 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 	// If we are threshold pivoting, get row counts.
 	lastlu := 0
 
-	//lasta := a_colptr[ncol] - 1
-	lu.u_colptr[0] = 1
+	//lasta := colptrA[ncol] - 1
+	lu.uColPtr[0] = 1
 
 	ifill(pattern, nrow, 0)
 	ifill(found, nrow, 0)
 	rfill(rwork, nrow, 0)
-	ifill(lu.row_perm, nrow, 0)
+	ifill(lu.rowPerm, nrow, 0)
 
-	if user_col_perm == nil {
+	if userColPerm == nil {
 		for jcol := 0; jcol < ncol; jcol++ {
-			lu.col_perm[jcol] = jcol + 1
+			lu.colPerm[jcol] = jcol + 1
 		}
 	} else {
-		fmt.Printf("user_col_perm_base = %d\n", user_col_perm_base)
+		fmt.Printf("UserColPermBase = %d\n", userColPermBase)
 		for jcol := 0; jcol < ncol; jcol++ {
-			lu.col_perm[jcol] = user_col_perm[jcol] + (1 - user_col_perm_base)
+			lu.colPerm[jcol] = userColPerm[jcol] + (1 - userColPermBase)
 		}
 	}
 
@@ -172,42 +175,42 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 	for jcol := 1; jcol <= ncol; jcol++ {
 
 		// Mark pointer to new column, ensure it is large enough.
-		if lastlu+nrow >= lu.lu_size {
-			var new_size int = int(float64(lu.lu_size) * expand_ratio)
+		if lastlu+nrow >= lu.luSize {
+			newSize := int(float64(lu.luSize) * expandRatio)
 
-			//fmt.Fprintf(os.Stderr, "expanding to %d nonzeros...\n", new_size)
+			//fmt.Fprintf(os.Stderr, "expanding to %d nonzeros...\n", newSize)
 
-			lu.lu_nz = make([]float64, new_size)
-			lu.lu_rowind = make([]int, new_size)
+			lu.luNZ = make([]float64, newSize)
+			lu.luRowInd = make([]int, newSize)
 
-			lu.lu_size = new_size
+			lu.luSize = newSize
 		}
 
 		// Set up nonzero pattern.
 		{
-			jjj := lu.col_perm[jcol-1]
-			for i := a_colptr[jjj-1]; i < a_colptr[jjj]; i++ {
-				pattern[a_rowind[i-1]-1] = 1
+			jjj := lu.colPerm[jcol-1]
+			for i := colptrA[jjj-1]; i < colptrA[jjj]; i++ {
+				pattern[rowindA[i-1]-1] = 1
 			}
 
-			this_col = lu.col_perm[jcol-1]
-			orig_row = cmatch[this_col-1]
+			thisCol = lu.colPerm[jcol-1]
+			origRow = cmatch[thisCol-1]
 
-			pattern[orig_row-1] = 2
+			pattern[origRow-1] = 2
 
-			if lu.row_perm[orig_row-1] != 0 {
+			if lu.rowPerm[origRow-1] != 0 {
 				return nil, fmt.Errorf("pivot row from max-matching already used")
 			}
-			// pattern[ this_col - 1 ] = 2
+			// pattern[ thisCol - 1 ] = 2
 		}
 
 		// Depth-first search from each above-diagonal nonzero of column
 		// jcol of A, allocating storage for column jcol of U in
 		// topological order and also for the non-fill part of column
 		// jcol of L.
-		err := ludfs(jcol, a_nz, a_rowind, a_colptr, lastlu,
-			lu.lu_rowind, lu.l_colptr, lu.u_colptr,
-			lu.row_perm, lu.col_perm, rwork, found, parent, child)
+		err := ludfs(jcol, nzA, rowindA, colptrA, lastlu,
+			lu.luRowInd, lu.lColPtr, lu.uColPtr,
+			lu.rowPerm, lu.colPerm, rwork, found, parent, child)
 		if err != nil {
 			return nil, err
 		}
@@ -215,26 +218,26 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 		// Compute the values of column jcol of L and U in the dense
 		// vector, allocating storage for fill in L as necessary.
 
-		lucomp(jcol, lastlu, lu.lu_nz, lu.lu_rowind, lu.l_colptr, lu.u_colptr,
-			lu.row_perm, lu.col_perm, rwork, found)
+		lucomp(jcol, lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
+			lu.rowPerm, lu.colPerm, rwork, found)
 
-		//if rwork[orig_row-1] == 0.0 {
+		//if rwork[origRow-1] == 0.0 {
 		//	fmt.Printf("Warning: Matching to a zero\n")
 		//
-		//	for i := a_colptr[jcol-1]; i < a_colptr[jcol]; i++ {
-		//		fmt.Printf("(%d,%v) ", a_rowind[i-1], a_nz[i-1])
-		//		fmt.Printf(". orig_row=%d\n", orig_row)
+		//	for i := colptrA[jcol-1]; i < colptrA[jcol]; i++ {
+		//		fmt.Printf("(%d,%v) ", rowindA[i-1], nzA[i-1])
+		//		fmt.Printf(". origRow=%d\n", origRow)
 		//	}
 		//}
 
 		// Copy the dense vector into the sparse data structure, find the
 		// diagonal element (pivoting if specified), and divide the
 		// column of L by it.
-		nz_count_limit := int(col_fill_ratio * (float64(a_colptr[this_col] - a_colptr[this_col-1] + 1)))
+		nzCountLimit := int(colFillRatio * (float64(colptrA[thisCol] - colptrA[thisCol-1] + 1)))
 
-		zpivot, err := lucopy(pivot_policy, pivot_threshold, drop_threshold, nz_count_limit,
-			jcol, ncol, &lastlu, lu.lu_nz, lu.lu_rowind, lu.l_colptr, lu.u_colptr,
-			lu.row_perm, lu.col_perm, rwork, pattern, twork)
+		zpivot, err := lucopy(pivotPolicy, pivotThreshold, dropThreshold, nzCountLimit,
+			jcol, ncol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
+			lu.rowPerm, lu.colPerm, rwork, pattern, twork)
 		if err != nil {
 			return nil, err
 		}
@@ -243,27 +246,27 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 		}
 
 		{
-			jjj := lu.col_perm[jcol-1]
-			for i := a_colptr[jjj-1]; i < a_colptr[jjj]; i++ {
-				pattern[a_rowind[i-1]-1] = 0
+			jjj := lu.colPerm[jcol-1]
+			for i := colptrA[jjj-1]; i < colptrA[jjj]; i++ {
+				pattern[rowindA[i-1]-1] = 0
 			}
 
-			pattern[orig_row-1] = 0
+			pattern[origRow-1] = 0
 
-			pivt_row = zpivot
-			othr_col = rmatch[pivt_row-1]
+			pivtRow = zpivot
+			othrCol = rmatch[pivtRow-1]
 
-			cmatch[this_col-1] = pivt_row
-			cmatch[othr_col-1] = orig_row
-			rmatch[orig_row-1] = othr_col
-			rmatch[pivt_row-1] = this_col
+			cmatch[thisCol-1] = pivtRow
+			cmatch[othrCol-1] = origRow
+			rmatch[origRow-1] = othrCol
+			rmatch[pivtRow-1] = thisCol
 
-			//pattern[this_col - 1] = 0
+			//pattern[thisCol - 1] = 0
 		}
 
 		// If there are no diagonal elements after this column, change the pivot mode.
 		if jcol == nrow {
-			pivot_policy = -1
+			pivotPolicy = -1
 		}
 	}
 
@@ -271,25 +274,25 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 	// rows so the data structure represents L and U, not PtL and PtU.
 	jcol := ncol + 1
 	for i := 0; i < nrow; i++ {
-		if (lu.row_perm)[i] == 0 {
-			lu.row_perm[i] = jcol
+		if (lu.rowPerm)[i] == 0 {
+			lu.rowPerm[i] = jcol
 			jcol = jcol + 1
 		}
 	}
 
 	for i := 0; i < lastlu; i++ {
-		lu.lu_rowind[i] = lu.row_perm[lu.lu_rowind[i]-1]
+		lu.luRowInd[i] = lu.rowPerm[lu.luRowInd[i]-1]
 	}
 
 	//fmt.Printf("rperm:\n[")
 	//for i := 0; i < ncol; i++ {
-	//	fmt.Printf("%d ", lu.row_perm[i])
+	//	fmt.Printf("%d ", lu.rowPerm[i])
 	//}
 	//fmt.Printf("]\n")
 	//
 	//fmt.Printf("cperm:\n[")
 	//for i := 0; i < ncol; i++ {
-	//	fmt.Printf("%d ", lu.col_perm[i])
+	//	fmt.Printf("%d ", lu.ColPerm[i])
 	//}
 	//fmt.Printf("]\n")
 
@@ -298,7 +301,7 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 		minujj := math.Inf(0)
 
 		for jcol := 1; jcol <= ncol; jcol++ {
-			ujj = math.Abs(lu.lu_nz[lu.l_colptr[jcol-1]-2])
+			ujj = math.Abs(lu.luNZ[lu.lColPtr[jcol-1]-2])
 			if ujj < minujj {
 				minujj = ujj
 			}
@@ -310,7 +313,7 @@ func DGSTRF(gp *gp_t, nrow, ncol int, a_nz []float64, desc_a *desc) (*lu_t, erro
 	return lu, nil
 }
 
-func DGSTRS(gp *gp_t, trans string, n, nrhs int, lu *lu_t /*ia, ja int,*/, b []float64 /*, ib, jb int*/) error {
+func DGSTRS(gp *GP, trans string, n, nrhs int, lu *LU /*ia, ja int,*/, b []float64 /*, ib, jb int*/) error {
 	var rwork []float64
 
 	if gp == nil {
@@ -323,11 +326,11 @@ func DGSTRS(gp *gp_t, trans string, n, nrhs int, lu *lu_t /*ia, ja int,*/, b []f
 	rwork = make([]float64, n)
 
 	if strings.ToUpper(trans) == "N" {
-		lsolve(n, lu.lu_nz, lu.lu_rowind, lu.l_colptr, lu.u_colptr, lu.row_perm, lu.col_perm, b, rwork)
-		usolve(n, lu.lu_nz, lu.lu_rowind, lu.l_colptr, lu.u_colptr, lu.row_perm, lu.col_perm, rwork, b)
+		lsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, rwork)
+		usolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, rwork, b)
 	} else if strings.ToUpper(trans) == "T" {
-		utsolve(n, lu.lu_nz, lu.lu_rowind, lu.l_colptr, lu.u_colptr, lu.row_perm, lu.col_perm, b, rwork)
-		ltsolve(n, lu.lu_nz, lu.lu_rowind, lu.l_colptr, lu.u_colptr, lu.row_perm, lu.col_perm, rwork, b)
+		utsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, rwork)
+		ltsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, rwork, b)
 	} else {
 		return fmt.Errorf("trans %q must be N or T", trans)
 	}

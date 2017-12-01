@@ -1,3 +1,6 @@
+// Copyright 1988 John Gilbert and Tim Peierls
+// All rights reserved.
+
 package lufact
 
 import "fmt"
@@ -84,10 +87,10 @@ import "fmt"
 //   overwr  set to .true. if A and LU as given are equivalent arrays
 //   xa      starting index of nonzeros in A/AROW (initially 1)
 //   zpivot  set to .true. if a zero pivot is found by lucopy()
-func lufact(pivot int, pivot_threshold, drop_threshold float64, nrow, ncol int, a []float64, arow []int, acolst []int,
+func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a []float64, arow []int, acolst []int,
 	maxlu, lastlu int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int) error {
 
-	var nz_count int
+	var nzCount int
 
 	// Allocate work arrays.
 	rwork := make([]float64, nrow)
@@ -154,7 +157,7 @@ func lufact(pivot int, pivot_threshold, drop_threshold float64, nrow, ncol int, 
 		// diagonal element (pivoting if specified), and divide the
 		// column of L by it.
 
-		zpivot, err := lucopy(locpiv, pivot_threshold, drop_threshold, nz_count, jcol, ncol /*&iwork[rowcnt],*/, &lastlu, lu, lurow, lcolst, ucolst, rperm, cperm, rwork, found, twork)
+		zpivot, err := lucopy(locpiv, pivotThreshold, dropThreshold, nzCount, jcol, ncol /*&iwork[rowcnt],*/, &lastlu, lu, lurow, lcolst, ucolst, rperm, cperm, rwork, found, twork)
 		if err != nil {
 			return err
 		}

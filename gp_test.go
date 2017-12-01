@@ -6,9 +6,14 @@ import (
 	"math"
 	"testing"
 	"time"
-
-	math2 "github.com/pkg/math"
 )
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 // This is a sample driver for lufact and lusolv, to illustrate how
 // they are called.  It reads a matrix from a file in a format
@@ -213,7 +218,7 @@ l500: /*continue*/
 	}
 
 	//     Output the results (problem is rectangular).
-	n = math2.MinInt(nrow, ncol)
+	n = minInt(nrow, ncol)
 	fmt.Println(nrow, n)
 	for i := 1; i <= n-1; i++ {
 		fmt.Println(ucolst[i+1] - lcolst[i] + 1)

@@ -1,3 +1,6 @@
+// Copyright 1988 John Gilbert and Tim Peierls
+// All rights reserved.
+
 package lufact
 
 // lusolv solves a square linear system, given an LU factorization.
