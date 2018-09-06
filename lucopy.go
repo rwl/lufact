@@ -70,46 +70,46 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		// No pivoting, diagonal element has irow = jcol.
 		// Copy the column elements of U and L, throwing out zeros.
 
-		if ucolst[jcol+1]-1 < ucolst[jcol] {
+		if ucolst[jcol+1-off]-1 < ucolst[jcol-off] {
 			//zpivot = -1
 			return -1, fmt.Errorf("zero length (U-I+L) column")
 		}
 
 		// Start with U.
-		nzcpy := ucolst[jcol]
-		for nzptr := ucolst[jcol]; nzptr <= lcolst[jcol]-1; nzptr++ {
-			irow := lurow[nzptr]
+		nzcpy := ucolst[jcol-off]
+		for nzptr := ucolst[jcol-off]; nzptr <= lcolst[jcol-off]-1; nzptr++ {
+			irow := lurow[nzptr-off]
 
-			if pattern[irow] != 0 || irow == cperm[jcol] {
-				lurow[nzcpy] = irow
-				lu[nzcpy] = dense[irow]
-				dense[irow] = 0.0
+			if pattern[irow-off] != 0 || irow == cperm[jcol-off] {
+				lurow[nzcpy-off] = irow
+				lu[nzcpy-off] = dense[irow-off]
+				dense[irow-off] = 0.0
 				nzcpy = nzcpy + 1
 			} else {
-				dense[irow] = 0.0
+				dense[irow-off] = 0.0
 			}
 		}
 		lastu := nzcpy - 1
 
 		//    Now do L. Same action as U, except that we search for diagonal.
-		for nzptr := lcolst[jcol]; nzptr <= ucolst[jcol+1]-1; nzptr++ {
-			irow := lurow[nzptr]
-			//if irow == cperm[jcol] {
-			if pattern[irow] == 2 {
+		for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
+			irow := lurow[nzptr-off]
+			//if irow == cperm[jcol-off] {
+			if pattern[irow-off] == 2 {
 				ujjptr = nzcpy
 			}
-			if pattern[irow] != 0 || /*irow == cperm(jcol)) then*/ pattern[irow] == 2 {
-				lurow[nzcpy] = irow
-				lu[nzcpy] = dense[irow]
-				dense[irow] = 0.0
+			if pattern[irow-off] != 0 || /*irow == cperm(jcol-off)) then*/ pattern[irow-off] == 2 {
+				lurow[nzcpy-off] = irow
+				lu[nzcpy-off] = dense[irow-off]
+				dense[irow-off] = 0.0
 				nzcpy = nzcpy + 1
 			} else {
-				dense[irow] = 0.0
+				dense[irow-off] = 0.0
 			}
 		}
 
-		lcolst[jcol] = lastu + 1
-		ucolst[jcol+1] = nzcpy
+		lcolst[jcol-off] = lastu + 1
+		ucolst[jcol+1-off] = nzcpy
 		*lastlu = nzcpy - 1
 
 		if pivot == -1 {
@@ -121,7 +121,7 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		var udthreshabs, ldthreshabs float64
 
 		// Partial and threshold pivoting.
-		if ucolst[jcol+1]-1 < lcolst[jcol] {
+		if ucolst[jcol+1-off]-1 < lcolst[jcol-off] {
 			//zpivot = -1
 			return -1, fmt.Errorf("zero length L column")
 		}
@@ -130,9 +130,9 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		// Compute the drop threshold for the column
 		if nzcount <= 0 {
 			maxpivglb := -1.0
-			for nzptr := ucolst[jcol]; nzptr <= lcolst[jcol]-1; nzptr++ {
-				irow := lurow[nzptr]
-				utemp := math.Abs(dense[irow])
+			for nzptr := ucolst[jcol-off]; nzptr <= lcolst[jcol-off]-1; nzptr++ {
+				irow := lurow[nzptr-off]
+				utemp := math.Abs(dense[irow-off])
 				if utemp > maxpivglb {
 					maxpivglb = utemp
 				}
@@ -140,9 +140,9 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 			udthreshabs = dthresh * maxpivglb
 
 			maxpivglb = -1.0
-			for nzptr := lcolst[jcol]; nzptr <= ucolst[jcol+1]-1; nzptr++ {
-				irow := lurow[nzptr]
-				utemp := math.Abs(dense[irow])
+			for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
+				irow := lurow[nzptr-off]
+				utemp := math.Abs(dense[irow-off])
 				if utemp > maxpivglb {
 					maxpivglb = utemp
 				}
@@ -150,10 +150,10 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 			ldthreshabs = dthresh * maxpivglb
 		} else {
 			i := 0
-			for nzptr := ucolst[jcol]; nzptr <= lcolst[jcol]-1; nzptr++ {
+			for nzptr := ucolst[jcol-off]; nzptr <= lcolst[jcol-off]-1; nzptr++ {
 				i = i + 1
-				irow := lurow[nzptr]
-				utemp := math.Abs(dense[irow])
+				irow := lurow[nzptr-off]
+				utemp := math.Abs(dense[irow-off])
 				twork[i] = utemp
 			}
 			if nzcount < i {
@@ -165,11 +165,11 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 			}
 
 			i = 0
-			for nzptr := lcolst[jcol]; nzptr <= ucolst[jcol+1]-1; nzptr++ {
+			for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
 				i = i + 1
-				irow := lurow[nzptr]
-				utemp := math.Abs(dense[irow])
-				twork[i] = utemp
+				irow := lurow[nzptr-off]
+				utemp := math.Abs(dense[irow-off])
+				twork[i-off] = utemp
 			}
 			if nzcount < i {
 				var kth float64
@@ -182,19 +182,19 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		}
 
 		// Copy the column elements of U, throwing out zeros.
-		nzcpy := ucolst[jcol]
-		if lcolst[jcol]-1 >= ucolst[jcol] {
-			for nzptr := ucolst[jcol]; nzptr <= lcolst[jcol]-1; nzptr++ {
-				irow := lurow[nzptr]
+		nzcpy := ucolst[jcol-off]
+		if lcolst[jcol-off]-1 >= ucolst[jcol-off] {
+			for nzptr := ucolst[jcol-off]; nzptr <= lcolst[jcol-off]-1; nzptr++ {
+				irow := lurow[nzptr-off]
 
 				//if (pattern(irow) .ne. 0 .or. pattern(irow) .eq. 2) then
-				if pattern[irow] != 0 || math.Abs(dense[irow]) >= udthreshabs {
-					lurow[nzcpy] = irow
-					lu[nzcpy] = dense[irow]
-					dense[irow] = 0.0
+				if pattern[irow-off] != 0 || math.Abs(dense[irow-off]) >= udthreshabs {
+					lurow[nzcpy-off] = irow
+					lu[nzcpy-off] = dense[irow-off]
+					dense[irow-off] = 0.0
 					nzcpy = nzcpy + 1
 				} else {
-					dense[irow] = 0.0
+					dense[irow-off] = 0.0
 				}
 			}
 		}
@@ -203,7 +203,7 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		// Copy the column elements of L, throwing out zeros.
 		// Keep track of maximum magnitude element for pivot.
 
-		if ucolst[jcol+1]-1 < lcolst[jcol] {
+		if ucolst[jcol+1-off]-1 < lcolst[jcol-off] {
 			//zpivot = -1
 			return -1, fmt.Errorf("zero length L column")
 		}
@@ -216,12 +216,12 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		maxpiv := -1.0
 		maxpivglb := -1.0
 
-		for nzptr := lcolst[jcol]; nzptr <= ucolst[jcol+1]-1; nzptr++ {
-			irow := lurow[nzptr]
-			utemp := math.Abs(dense[irow])
+		for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
+			irow := lurow[nzptr-off]
+			utemp := math.Abs(dense[irow-off])
 
-			//if irow == cperm[jcol] {
-			if pattern[irow] == 2 {
+			//if irow == cperm[jcol-off] {
+			if pattern[irow-off] == 2 {
 				diagptr = irow
 				diagpiv = utemp
 				//if diagpiv == 0 { print*, 'WARNING: Numerically zero diagonal element at col', jcol }
@@ -251,7 +251,7 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		}
 
 		if diagptr == 0 && ujjptr == 0 {
-			fmt.Printf("error: %v", ucolst[jcol+1]-lcolst[jcol])
+			fmt.Printf("error: %v", ucolst[jcol+1-off]-lcolst[jcol-off])
 		}
 
 		//if diagptr != ujjptr {
@@ -261,11 +261,11 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		diagptr = ujjptr
 		ujjptr = 0
 
-		for nzptr := lcolst[jcol]; nzptr <= ucolst[jcol+1]-1; nzptr++ {
-			irow := lurow[nzptr]
-			utemp := math.Abs(dense[irow])
+		for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
+			irow := lurow[nzptr-off]
+			utemp := math.Abs(dense[irow-off])
 
-			//if irow == cperm[jcol] {
+			//if irow == cperm[jcol-off] {
 			//   diagptr = nzcpy
 			//   diagpiv = utemp
 			//}
@@ -276,26 +276,26 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 			//}
 
 			// Pattern dropping.
-			// if pattern[irow] == 0 && irow != diagptr {
+			// if pattern[irow-off] == 0 && irow != diagptr {
 
 			// Pattern + threshold dropping.
 
-			if pattern[irow] == 0 && irow != diagptr && utemp < ldthreshabs {
-				dense[irow] = 0.0
+			if pattern[irow-off] == 0 && irow != diagptr && utemp < ldthreshabs {
+				dense[irow-off] = 0.0
 			} else {
 				if irow == diagptr {
 					ujjptr = nzcpy
 				}
 
-				lurow[nzcpy] = irow
-				lu[nzcpy] = dense[irow]
-				dense[irow] = 0.0
+				lurow[nzcpy-off] = irow
+				lu[nzcpy-off] = dense[irow-off]
+				dense[irow-off] = 0.0
 				nzcpy = nzcpy + 1
 			}
 		}
 
-		lcolst[jcol] = lastu + 1
-		ucolst[jcol+1] = nzcpy
+		lcolst[jcol-off] = lastu + 1
+		ucolst[jcol+1-off] = nzcpy
 		*lastlu = nzcpy - 1
 
 	}
@@ -303,39 +303,39 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 	// Diagonal element has been found. Swap U(jcol,jcol) from L into U.
 
 	if ujjptr == 0 {
-		return -1, fmt.Errorf("ujjptr not set (1)" /*diagptr*/, ujjptr, lcolst[jcol], ucolst[jcol+1]-1)
+		return -1, fmt.Errorf("ujjptr not set (1) %v %v %v" /*diagptr*/, ujjptr, lcolst[jcol-off], ucolst[jcol+1-off]-1)
 	}
 
-	pivrow := lurow[ujjptr]
-	ujj := lu[ujjptr]
+	pivrow := lurow[ujjptr-off]
+	ujj := lu[ujjptr-off]
 
 	if ujj == 0.0 {
 		return -1, fmt.Errorf("numerically zero diagonal element at column %v", jcol)
 	}
-	dptr := lcolst[jcol]
-	lurow[ujjptr] = lurow[dptr]
-	lu[ujjptr] = lu[dptr]
-	lurow[dptr] = pivrow
-	lu[dptr] = ujj
-	lcolst[jcol] = dptr + 1
+	dptr := lcolst[jcol-off]
+	lurow[ujjptr-off] = lurow[dptr-off]
+	lu[ujjptr-off] = lu[dptr-off]
+	lurow[dptr-off] = pivrow
+	lu[dptr-off] = ujj
+	lcolst[jcol-off] = dptr + 1
 
 	// Record the pivot in P.
 
-	rperm[pivrow] = jcol
+	rperm[pivrow-off] = jcol
 	//if pivrow == 38 {
 	//	print("exchanging", jcol, pivrow)
 	//}
 
 	// Divide column jcol of L by U(jcol,jcol).
 
-	nzst := lcolst[jcol]
-	nzend := ucolst[jcol+1] - 1
+	nzst := lcolst[jcol-off]
+	nzend := ucolst[jcol+1-off] - 1
 	if nzst > nzend {
 		zpivot := pivrow
 		return zpivot, nil
 	}
 	for nzptr := nzst; nzptr <= nzend; nzptr++ {
-		lu[nzptr] = lu[nzptr] / ujj
+		lu[nzptr-off] = lu[nzptr-off] / ujj
 	}
 
 	zpivot := pivrow

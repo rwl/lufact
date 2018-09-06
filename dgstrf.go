@@ -33,8 +33,8 @@ func NewGP() *GP {
 	return &GP{
 		PivotPolicy:    1,
 		PivotThreshold: 1,
-		DropThreshold:  0,
-		ColFillRatio:   -1,
+		DropThreshold:  0,  // do not drop
+		ColFillRatio:   -1, // do not limit column fill ratio
 		FillRatio:      4,
 		ExpandRatio:    1.2,
 		ColPerm:        nil,
@@ -150,7 +150,7 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 
 	// Initialize useful values and zero out the dense vectors.
 	// If we are threshold pivoting, get row counts.
-	lastlu := 0
+	var lastlu = 0
 
 	//lasta := colptrA[ncol] - 1
 	lu.uColPtr[0] = 1
@@ -180,7 +180,7 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 
 			//fmt.Fprintf(os.Stderr, "expanding to %d nonzeros...\n", newSize)
 
-			lu.luNZ = make([]float64, newSize)
+			lu.luNZ = make([]float64, newSize) // FIXME: realloc
 			lu.luRowInd = make([]int, newSize)
 
 			lu.luSize = newSize
@@ -208,7 +208,7 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 		// jcol of A, allocating storage for column jcol of U in
 		// topological order and also for the non-fill part of column
 		// jcol of L.
-		err := ludfs(jcol, nzA, rowindA, colptrA, lastlu,
+		err := ludfs(jcol, nzA, rowindA, colptrA, &lastlu,
 			lu.luRowInd, lu.lColPtr, lu.uColPtr,
 			lu.rowPerm, lu.colPerm, rwork, found, parent, child)
 		if err != nil {
@@ -218,7 +218,7 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 		// Compute the values of column jcol of L and U in the dense
 		// vector, allocating storage for fill in L as necessary.
 
-		lucomp(jcol, lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
+		lucomp(jcol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
 			lu.rowPerm, lu.colPerm, rwork, found)
 
 		//if rwork[origRow-1] == 0.0 {

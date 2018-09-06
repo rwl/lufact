@@ -28,50 +28,50 @@ func lsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, x
 
 	// Check that rperm is really a permutation.
 	for i := 1; i <= n; i++ {
-		x[i] = 0
+		x[i-off] = 0
 	}
 	for i := 1; i <= n; i++ {
-		if rperm[i] < 1 || rperm[i] > n {
-			return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i])
+		if rperm[i-off] < 1 || rperm[i-off] > n {
+			return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i-off])
 		}
-		if x[rperm[i]] != 0.0 {
-			return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i])
+		if x[rperm[i-off]] != 0.0 {
+			return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i-off])
 		}
-		x[rperm[i]] = 1.0
+		x[rperm[i-off]-off] = 1.0
 	}
 
 	// Check that cperm is really a permutation.
 	/*for i := 1; n; i++ {
-		x[i] = 0
+		x[i-off] = 0
 	}
 	for i := 1; n; i++ {
-		if cperm[i] < 1 || cperm[i] > n {
-			return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i])
+		if cperm[i-off] < 1 || cperm[i-off] > n {
+			return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i-off])
 		}
-		if x[cperm[i]] != 0.0 {
-			return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i])
+		if x[cperm[i-off]-off] != 0.0 {
+			return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i-off])
 		}
-		x[cperm[i]] = 1.0
+		x[cperm[i-off]-off] = 1.0
 	}*/
 
 	// Solve the system.
 	for i := 1; i <= n; i++ {
-		x[rperm[i]] = b[i]
+		x[rperm[i-off]-off] = b[i-off]
 	}
 
 	for j := 1; j <= n; j++ {
-		nzst := lcolst[j]
-		nzend := ucolst[j+1] - 1
+		nzst := lcolst[j-off]
+		nzend := ucolst[j+1-off] - 1
 		if nzst < 1 || nzst > nzend+1 {
 			return fmt.Errorf("lsolve, inconsistent column of L: j=%v nzst=%v, nzend=%v", j, nzst, nzend)
 		}
 		if nzst <= nzend {
 			for nzptr := nzst; nzptr <= nzend; nzptr++ {
-				i := lurow[nzptr]
+				i := lurow[nzptr-off]
 				if i <= j || i > n {
 					return fmt.Errorf("lsolve, illegal row i in column j of L: i=%v, j=%v, nzptr=%v", i, j, nzptr)
 				}
-				x[i] = x[i] - lu[nzptr]*x[j]
+				x[i-off] = x[i-off] - lu[nzptr-off]*x[j-off]
 			}
 		}
 	}

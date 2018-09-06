@@ -26,42 +26,42 @@ func usolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, x
 		return fmt.Errorf("usolve called with nonpositive n=%v", n)
 	}
 	for i := 1; i <= n; i++ {
-		x[i] = b[i]
+		x[i-off] = b[i-off]
 	}
 
 	for jj := 1; jj <= n; jj++ {
 		j := n + 1 - jj
-		nzst := ucolst[j]
-		nzend := lcolst[j] - 1
+		nzst := ucolst[j-off]
+		nzend := lcolst[j-off] - 1
 		if nzst < 1 || nzst > nzend {
 			return fmt.Errorf("usolve, inconsistent column of U: j=%v, nzst=%v, nzend=%v", j, nzst, nzend)
 		}
-		if lurow[nzend] != j {
-			return fmt.Errorf("usolve, diagonal elt of col j is not in last place: j=%v, nzend=%v, lurow[nzend]=%v", j, nzend, lurow[nzend])
+		if lurow[nzend-off] != j {
+			return fmt.Errorf("usolve, diagonal elt of col j is not in last place: j=%v, nzend=%v, lurow[nzend]=%v", j, nzend, lurow[nzend-off])
 		}
-		if lu[nzend] == 0.0 {
+		if lu[nzend-off] == 0.0 {
 			return fmt.Errorf("usolve, zero diagonal element in column j=%v", j)
 		}
-		x[j] = x[j] / lu[nzend]
+		x[j-off] = x[j-off] / lu[nzend-off]
 		nzend = nzend - 1
 		if nzst > nzend {
 			goto l150
 		}
 		for nzptr := nzst; nzptr <= nzend; nzptr++ {
-			i := lurow[nzptr]
+			i := lurow[nzptr-off]
 			if i <= 0 || i >= j {
-				fmt.Errorf("usolve, illegal row i in column j of U: i=%v, j=%v, nzptr=%v", i, j, nzptr)
+				return fmt.Errorf("usolve, illegal row i in column j of U: i=%v, j=%v, nzptr=%v", i, j, nzptr)
 			}
-			x[i] = x[i] - lu[nzptr]*x[j]
+			x[i-off] = x[i-off] - lu[nzptr-off]*x[j-off]
 		}
 	l150:
 	}
 
 	for i := 1; i <= n; i++ {
-		b[i] = x[i]
+		b[i-off] = x[i-off]
 	}
 	for i := 1; i <= n; i++ {
-		x[cperm[i]] = b[i]
+		x[cperm[i-off]-off] = b[i-off]
 	}
 
 	return nil
@@ -97,19 +97,19 @@ func utsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, 
 	//50        continue
 
 	for i := 1; i <= n; i++ {
-		x[i] = b[cperm[i]]
+		x[i-off] = b[cperm[i-off]-off]
 	}
 
 	for j := 1; j <= n; j++ {
-		nzst := ucolst[j]
-		nzend := lcolst[j] - 1
+		nzst := ucolst[j-off]
+		nzend := lcolst[j-off] - 1
 		if nzst < 1 || nzst > nzend {
 			return fmt.Errorf("utsolve, inconsistent column of U: j=%v, nzst=%v, nzend=%v", j, nzst, nzend)
 		}
-		if lurow[nzend] != j {
-			return fmt.Errorf("utsolve, diagonal elt of col j is not in last place: j=%v, nzend=%v, lurow[nzend]=%v", j, nzend, lurow[nzend])
+		if lurow[nzend-off] != j {
+			return fmt.Errorf("utsolve, diagonal elt of col j is not in last place: j=%v, nzend=%v, lurow[nzend]=%v", j, nzend, lurow[nzend-off])
 		}
-		if lu[nzend] == 0.0 {
+		if lu[nzend-off] == 0.0 {
 			return fmt.Errorf("utsolve, zero diagonal element in column j=%v", j)
 		}
 		nzend = nzend - 1
@@ -117,14 +117,14 @@ func utsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, 
 			goto l150
 		}
 		for nzptr := nzst; nzptr <= nzend; nzptr++ {
-			i := lurow[nzptr]
+			i := lurow[nzptr-off]
 			if i <= 0 || i >= j {
 				return fmt.Errorf("utsolve, illegal row i in column j of U: i=%v, j=%v, nzptr=%v", i, j, nzptr)
 			}
-			x[j] = x[j] - lu[nzptr]*x[i]
+			x[j-off] = x[j-off] - lu[nzptr-off]*x[i-off]
 		}
 	l150:
-		x[j] = x[j] / lu[nzend+1]
+		x[j-off] = x[j-off] / lu[nzend+1-off]
 	}
 	//l200:
 

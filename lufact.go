@@ -5,6 +5,8 @@ package lufact
 
 import "fmt"
 
+const off int = 1
+
 // lufact provides sparse LU factorization with partial pivoting.
 //
 // Given a matrix A in sparse format by columns, perform an LU
@@ -88,7 +90,7 @@ import "fmt"
 //   xa      starting index of nonzeros in A/AROW (initially 1)
 //   zpivot  set to .true. if a zero pivot is found by lucopy()
 func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a []float64, arow []int, acolst []int,
-	maxlu, lastlu int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int) error {
+	maxlu int, lastlu *int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int) error {
 
 	var nzCount int
 
@@ -105,9 +107,9 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 	// If we are threshold pivoting, get row counts.
 
 	locpiv := pivot
-	lastlu = 0
-	lasta := acolst[ncol+1] - 1
-	ucolst[0] = 1
+	*lastlu = 0
+	lasta := acolst[ncol+1-off] - 1
+	ucolst[1-off] = 1
 
 	ifill(rperm, nrow, 0)
 
@@ -123,8 +125,8 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 	overwr := requiv(a, lu)
 	if overwr {
 		xa = maxlu - lasta + 1
-		rcopy(a, a[xa:], lasta, true)
-		icopy(arow, arow[xa:], lasta, true)
+		rcopy(a, a[xa-off:], lasta, true)
+		icopy(arow, arow[xa-off:], lasta, true)
 	}
 
 	// Compute one column at a time.
@@ -135,9 +137,9 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 
 		maxcol := maxlu
 		if overwr {
-			maxcol = xa + acolst[jcol] - 2
+			maxcol = xa + acolst[jcol-off] - 2
 		}
-		if lastlu+nrow >= maxcol {
+		if *lastlu+nrow >= maxcol {
 			return fmt.Errorf("limit of maxcol %v exceeded at column jcol %v", maxcol, jcol)
 		}
 
@@ -146,7 +148,7 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 		// topological order and also for the non-fill part of column
 		// jcol of L.
 
-		ludfs(jcol, a[xa:], arow[xa:], acolst, lastlu, lurow, lcolst, ucolst, rperm, cperm, rwork, found, parent, child)
+		ludfs(jcol, a[xa-off:], arow[xa-off:], acolst, lastlu, lurow, lcolst, ucolst, rperm, cperm, rwork, found, parent, child)
 
 		// Compute the values of column jcol of L and U in the dense
 		// vector, allocating storage for fill in L as necessary.
@@ -157,7 +159,7 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 		// diagonal element (pivoting if specified), and divide the
 		// column of L by it.
 
-		zpivot, err := lucopy(locpiv, pivotThreshold, dropThreshold, nzCount, jcol, ncol /*&iwork[rowcnt],*/, &lastlu, lu, lurow, lcolst, ucolst, rperm, cperm, rwork, found, twork)
+		zpivot, err := lucopy(locpiv, pivotThreshold, dropThreshold, nzCount, jcol, ncol /*&iwork[rowcnt],*/, lastlu, lu, lurow, lcolst, ucolst, rperm, cperm, rwork, found, twork)
 		if err != nil {
 			return err
 		}
@@ -178,15 +180,15 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 
 	jcol := ncol + 1
 	for i := 1; i <= nrow; i++ {
-		if rperm[i] != 0 {
-			break // FIXME: continue?
+		if rperm[i-off] != 0 {
+			continue
 		}
-		rperm[i] = jcol // FIXME: cperm
+		rperm[i-off] = jcol // FIXME: cperm
 		jcol = jcol + 1
 		//l300:
 	}
-	for i := 1; i <= lastlu; i++ {
-		lurow[i] = rperm[lurow[i]]
+	for i := 1; i <= *lastlu; i++ {
+		lurow[i-off] = rperm[lurow[i-off]-off]
 		//l400:
 	}
 	return nil

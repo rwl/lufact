@@ -37,7 +37,7 @@ package lufact
 //
 //           Both dense and found are indexed according to the row
 //           numbering of A, not PA.
-func lucomp(jcol, lastlu int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, dense []float64, found /*, pattern*/ []int /*, flops float64*/) {
+func lucomp(jcol int, lastlu *int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, dense []float64, found /*, pattern*/ []int /*, flops float64*/) {
 	// Local variables:
 	//   nzuptr                pointer to current nonzero PtU(krow,jcol).
 	//   nzuend, nnzu, nzuind  used to compute nzuptr.
@@ -53,39 +53,39 @@ func lucomp(jcol, lastlu int, lu []float64, lurow, lcolst, ucolst, rperm, cperm 
 
 	//    For each krow with PtU(krow,jcol) != 0, in reverse postorder, use
 	//    column kcol = rperm(krow) of L to update the current column.
-	nzuend := lcolst[jcol]
-	nnzu := nzuend - ucolst[jcol]
+	nzuend := lcolst[jcol-off]
+	nnzu := nzuend - ucolst[jcol-off]
 	if nnzu != 0 {
 		for nzuind := 1; nzuind <= nnzu; nzuind++ {
 			nzuptr := nzuend - nzuind
-			krow := lurow[nzuptr]
-			kcol := rperm[krow]
-			ukj := dense[krow]
-			//if pattern[rperm[krow]] == 0 {
+			krow := lurow[nzuptr-off]
+			kcol := rperm[krow-off]
+			ukj := dense[krow-off]
+			//if pattern[rperm[krow-off]-off] == 0 {
 			//	ukj = 0
 			//}
 
 			// For each irow with PtL(irow,kcol) != 0, update PtL(irow,jcol) or PtU(irow,jcol)
 
-			nzlst := lcolst[kcol]
-			nzlend := ucolst[kcol+1] - 1
+			nzlst := lcolst[kcol-off]
+			nzlend := ucolst[kcol+1-off] - 1
 			if nzlend < nzlst {
-				ucolst[jcol+1] = lastlu + 1
+				ucolst[jcol+1-off] = *lastlu + 1
 				return
 			}
 			for nzlptr := nzlst; nzlptr <= nzlend; nzlptr++ {
-				irow := lurow[nzlptr]
-				dense[irow] = dense[irow] - ukj*lu[nzlptr]
+				irow := lurow[nzlptr-off]
+				dense[irow-off] = dense[irow-off] - ukj*lu[nzlptr-off]
 
 				// If this is a new nonzero in L, allocate storage for it.
-				if found[irow] != jcol {
-					found[irow] = jcol
-					lastlu = lastlu + 1
-					lurow[lastlu] = irow
+				if found[irow-off] != jcol {
+					found[irow-off] = jcol
+					*lastlu = *lastlu + 1
+					lurow[*lastlu-off] = irow
 				}
 			}
 		}
 	}
-	ucolst[jcol+1] = lastlu + 1
+	ucolst[jcol+1-off] = *lastlu + 1
 	return
 }

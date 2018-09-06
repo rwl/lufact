@@ -26,7 +26,7 @@ import "fmt"
 //   error 0 if successful, 1 otherwise
 func ltsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, x []float64) error {
 	if n <= 0 {
-		fmt.Errorf("ltsolve called with nonpositive n=%v", n)
+		return fmt.Errorf("ltsolve called with nonpositive n=%v", n)
 	}
 
 	// Check that rperm is really a permutation.
@@ -53,33 +53,33 @@ func ltsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, 
 
 	// Solve the system.
 	for i := 1; i <= n; i++ {
-		x[i] = b[i]
+		x[i-off] = b[i-off]
 	}
 
 	for j := n; j >= 1; j-- {
-		nzst := lcolst[j]
-		nzend := ucolst[j+1] - 1
+		nzst := lcolst[j-off]
+		nzend := ucolst[j+1-off] - 1
 		if nzst < 1 || nzst > nzend+1 {
 			return fmt.Errorf("ltsolve, inconsistent column of L: j=%v, nzst=%v, nzend=%v", j, nzst, nzend)
 		}
 		if nzst <= nzend {
 			for nzptr := nzst; nzptr <= nzend; nzptr++ {
-				i := lurow[nzptr]
+				i := lurow[nzptr-off]
 				if i <= j || i > n {
 					return fmt.Errorf("ltsolve, illegal row i in column j of L: i=%v, j=%v, nzptr=%v", i, j, nzptr)
 				}
-				x[j] = x[j] - lu[nzptr]*x[i]
+				x[j-off] = x[j-off] - lu[nzptr-off]*x[i-off]
 			}
 		}
 	}
 
 	for i := 1; i <= n; i++ {
-		b[i] = x[i]
+		b[i-off] = x[i-off]
 	}
 
 	for i := 1; i <= n; i++ {
-		//x[rperm[i]] = b[i]
-		x[i] = b[rperm[i]]
+		//x[rperm[i-off]-off] = b[i-off]
+		x[i-off] = b[rperm[i-off]-off]
 	}
 	return nil
 }

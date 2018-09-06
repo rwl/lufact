@@ -39,14 +39,14 @@ func cntrow(arow []int, lasta int, rowcnt []int) {
 	// maxk marks the highest numbered row that has been seen.
 	maxk := 0
 	for i := 1; i <= lasta; i++ {
-		k := arow[i]
+		k := arow[i-off]
 		if k > maxk {
 			for j := maxk + 1; j <= k; j++ {
-				rowcnt[j] = 0
+				rowcnt[j-off] = 0
 			}
 			maxk = k
 		}
-		rowcnt[k] = rowcnt[k] + 1
+		rowcnt[k-off] = rowcnt[k-off] + 1
 	}
 }
 
@@ -61,13 +61,13 @@ func rcopy(a, b []float64, la int, mode bool) {
 		goto l200
 	}
 	for i := 1; i <= la; i++ {
-		b[i] = a[i]
+		b[i-off] = a[i-off]
 	}
 	return
 
 l200:
 	for i := la; i >= 1; i-- {
-		b[i] = a[i]
+		b[i-off] = a[i-off]
 	}
 	return
 }
@@ -81,19 +81,19 @@ func icopy(a, b []int, la int, mode bool) {
 
 	if !mode {
 		for i := 1; i <= la; i++ {
-			b[i] = a[i]
+			b[i-off] = a[i-off]
 		}
 		return
 	}
 	for i := la; i >= 1; i-- {
-		b[i] = a[i]
+		b[i-off] = a[i-off]
 	}
 }
 
 // rfill fills a real*8 array with a given value.
 func rfill(a []float64, la int, rval float64) {
 	for i := 1; i <= la; i++ {
-		a[i] = rval
+		a[i-off] = rval
 	}
 	return
 }
@@ -101,7 +101,7 @@ func rfill(a []float64, la int, rval float64) {
 // ifill fills an integer array with a given value.
 func ifill(a []int, la, ival int) {
 	for i := 1; i <= la; i++ {
-		a[i] = ival
+		a[i-off] = ival
 	}
 }
 
@@ -129,12 +129,12 @@ l100:
 		rnd = 1366*rnd + 150889%714025
 		q := p + (rnd % (r - p + 1))
 
-		tmp := A[p]
-		A[p] = A[q]
-		A[q] = tmp
+		tmp := A[p-off]
+		A[p-off] = A[q-off]
+		A[q-off] = tmp
 	}
 
-	x = A[p]
+	x = A[p-off]
 	i = p - 1
 	j = r + 1
 
@@ -143,20 +143,20 @@ l200:
 
 l210:
 	j = j - 1
-	if A[j] > x {
+	if A[j-off] > x {
 		goto l210
 	}
 
 l220:
 	i = i + 1
-	if A[i] < x {
+	if A[i-off] < x {
 		goto l220
 	}
 
 	if i < j {
-		tmp := A[i]
-		A[i] = A[j]
-		A[j] = tmp
+		tmp := A[i-off]
+		A[i-off] = A[j-off]
+		A[j-off] = tmp
 		goto l200
 	}
 
@@ -169,7 +169,7 @@ l220:
 	goto l100
 
 l900:
-	*kth = A[p]
+	*kth = A[p-off]
 	*info = 0
 	return
 }
@@ -177,17 +177,17 @@ l900:
 // requiv tests if two []float64 arrays start at the same address.
 func requiv(a, b []float64) bool {
 	requiv := false
-	temp := a[1]
-	a[1] = 0.0
-	if b[1] != 0.0 {
+	temp := a[1-off]
+	a[1-off] = 0.0
+	if b[1-off] != 0.0 {
 		goto l100
 	}
-	a[1] = 1.0
-	if b[1] != 1.0 {
+	a[1-off] = 1.0
+	if b[1-off] != 1.0 {
 		goto l100
 	}
 	requiv = true
 l100:
-	a[1] = temp
+	a[1-off] = temp
 	return requiv
 }
