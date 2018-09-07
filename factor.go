@@ -4,6 +4,7 @@
 package lufact
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -46,31 +47,38 @@ func WithoutPivoting() optFunc {
 	}
 }
 
-// PartialPivoting enables partial pivoting. Default.
-func PartialPivoting() optFunc {
+// PartialPivoting enables partial pivoting. Enabled by default.
+// pivotThreshold is the fraction of max pivot candidate
+// acceptable for pivoting. Default value is 1.
+func PartialPivoting(pivotThreshold float64) optFunc {
 	return func(opts *options) error {
 		opts.pivotPolicy = partialPivoting
+		opts.pivotThreshold = pivotThreshold
 		return nil
 	}
 }
 
 // ThresholdPivoting enables threshold pivoting.
-func ThresholdPivoting() optFunc {
+//
+// For each major step of the algorithm, the pivot is chosen to
+// be a nonzero below the diagonal in the current column of A
+// with the most nonzeros to the right in its row, with absolute
+// value at least dropThreshold*maxpiv, where maxpiv is the
+// largest absolute value below the diagonal in the current column.
+// Note that if dropThreshold <= 0.0, then the pivot is chosen
+// purely on the basis of row sparsity. Also, if
+// dropThreshold >= 1.0, then the pivoting is effectively partial
+// pivoting with ties broken on the basis of sparsity.
+func ThresholdPivoting(dropThreshold float64) optFunc {
 	return func(opts *options) error {
 		opts.pivotPolicy = thresholdPivoting
-		return nil
-	}
-}
-
-func DropThreshold(dropThreshold float64) optFunc {
-	return func(opts *options) error {
 		opts.dropThreshold = dropThreshold
-		if dropThreshold == 0 {
-			if Logger != nil {
-				fmt.Fprint(Logger, "zero drop threshold, pivoting disabled")
-			}
-			opts.pivotPolicy = noPivoting
-		}
+		//if dropThreshold == 0 {
+		//	if Logger != nil {
+		//		fmt.Fprint(Logger, "zero drop threshold, pivoting disabled")
+		//	}
+		//	opts.pivotPolicy = noPivoting
+		//}
 		return nil
 	}
 }
@@ -103,6 +111,7 @@ func ExpandRatio(expandRatio float64) optFunc {
 }
 
 // ColPerm sets the column permutation vector.
+// If nil natural ordering will be used.
 func ColPerm(colPerm []int) optFunc {
 	return func(opts *options) error {
 		opts.colPerm = colPerm
@@ -110,7 +119,7 @@ func ColPerm(colPerm []int) optFunc {
 	}
 }
 
-// LU is the LU decomposition resulting from symbolic factorization.
+// LU is a lower-upper numeric factorization.
 type LU struct {
 	luSize   int
 	luNZ     []float64
@@ -120,9 +129,18 @@ type LU struct {
 
 	rowPerm []int
 	colPerm []int
+
+	nA int
 }
 
-func DGSTRF(nA int, rowindA, colptrA []int, nzA []float64, optionFuncs ...optFunc) (*LU, error) {
+// Factor performs sparse LU factorization with partial pivoting.
+//
+// Given a matrix A in sparse format by columns, it performs an LU
+// factorization, with partial or threshold pivoting, if desired. The
+// factorization is PA = LU, where L and U are triangular. P, L, and U
+// are returned.  This subroutine uses the Coleman-Gilbert-Peierls
+// algorithm, in which total time is O(nonzero multiplications).
+func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) (*LU, error) {
 	var (
 		nrow = nA
 		ncol = nA
@@ -143,7 +161,7 @@ func DGSTRF(nA int, rowindA, colptrA []int, nzA []float64, optionFuncs ...optFun
 		fillRatio:      4,
 		expandRatio:    1.2,
 	}
-	for _, optionFunc := range optionFuncs {
+	for _, optionFunc := range optFuncs {
 		err := optionFunc(opts)
 		if err != nil {
 			return nil, err
@@ -198,6 +216,7 @@ func DGSTRF(nA int, rowindA, colptrA []int, nzA []float64, optionFuncs ...optFun
 		lColPtr:  make([]int, ncol),
 		rowPerm:  make([]int, nrow),
 		colPerm:  make([]int, ncol),
+		nA:       nA,
 	}
 
 	// Compute max matching. We use elements of the lu structure
@@ -398,20 +417,43 @@ func DGSTRF(nA int, rowindA, colptrA []int, nzA []float64, optionFuncs ...optFun
 	return lu, nil
 }
 
-func DGSTRS(trans bool, n, nrhs int, lu *LU, b []float64) error {
-	if nrhs != 1 {
-		return fmt.Errorf("nrhs must be 1")
+// Solve Ax=b for one or more right-hand-side given the numeric
+// factorization of A from Factor.
+func Solve(lu *LU, rhs [][]float64, trans bool) error {
+	if lu == nil {
+		return errors.New("lu must not be nil")
 	}
-
-	rwork := make([]float64, n)
-
-	if !trans {
-		lsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, rwork)
-		usolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, rwork, b)
-	} else {
-		utsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, rwork)
-		ltsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, rwork, b)
+	n := lu.nA
+	if len(rhs) == 0 {
+		return fmt.Errorf("one or more RHS must be specified")
 	}
+	for i, b := range rhs {
+		if len(b) != n {
+			return fmt.Errorf("len b[%d] (%v) must equal ord(A) (%v)", i, len(b), n)
+		}
+	}
+	work := make([]float64, n)
 
+	for _, b := range rhs {
+		if !trans {
+			err := lsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, work)
+			if err != nil {
+				return fmt.Errorf("lsolve: %v", err)
+			}
+			err = usolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, work, b)
+			if err != nil {
+				return fmt.Errorf("usolve: %v", err)
+			}
+		} else {
+			err := utsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, work)
+			if err != nil {
+				return fmt.Errorf("utsolve: %v", err)
+			}
+			err = ltsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, work, b)
+			if err != nil {
+				return fmt.Errorf("ltsolve: %v", err)
+			}
+		}
+	}
 	return nil
 }
