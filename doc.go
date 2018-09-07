@@ -28,4 +28,4 @@
 //
 // This source code is distributed, with the kind permission of John Gilbert
 // and Tim Peierls, under a 3-clause BSD license.
-package lufact
+package gp

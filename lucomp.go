@@ -1,7 +1,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package lufact
+package gp
 
 // lucomp computes one column of L and U in the dense vector.
 //

@@ -1,7 +1,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package lufact_test
+package gp_test
 
 import (
 	"fmt"
@@ -36,12 +36,12 @@ func ExampleFactor() {
 	)
 	colPerm = []int{6, 5, 2, 4, 1, 9, 7, 8, 0, 3}
 
-	lu, err := lufact.Factor(n, arow, acolst, a, lufact.ColPerm(colPerm))
+	lu, err := gp.Factor(n, arow, acolst, a, gp.ColPerm(colPerm))
 	if err != nil {
 		panic(err)
 	}
 
-	err = lufact.Solve(lu, [][]float64{b}, true)
+	err = gp.Solve(lu, [][]float64{b}, true)
 	if err != nil {
 		panic(err)
 	}

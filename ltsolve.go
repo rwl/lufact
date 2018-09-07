@@ -1,7 +1,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package lufact
+package gp
 
 import "fmt"
 
