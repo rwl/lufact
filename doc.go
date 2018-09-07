@@ -1,7 +1,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-// Package lufact provides sparse LU factorization with partial pivoting.
+// Package gp provides sparse LU factorization with partial pivoting.
 //
 // The algorithm is described in "Sparse Partial Pivoting in Time Proportional
 // to Arithmetic Operations" by John R. Gilbert and Tim Peierls.
