@@ -5,43 +5,112 @@ package lufact
 
 import (
 	"fmt"
+	"io"
 	"math"
-	"strings"
 )
 
-type Desc struct {
-	m, n, nnz      int
-	base           int
-	rowind, colptr []int
+// Logger is a writer used for logging messages.
+var Logger io.Writer
+
+type pivotPolicy int
+
+const (
+	stopPivoting      pivotPolicy = -1
+	noPivoting        pivotPolicy = 0
+	partialPivoting   pivotPolicy = 1
+	thresholdPivoting pivotPolicy = 2
+)
+
+type options struct {
+	pivotPolicy    pivotPolicy
+	pivotThreshold float64
+	dropThreshold  float64
+	colFillRatio   float64
+	fillRatio      float64
+	expandRatio    float64
+	colPerm        []int
 }
 
-type GP struct {
-	PivotPolicy    int // 0=none, 1=partial, 2=threshold
-	PivotThreshold float64
-	DropThreshold  float64
-	ColFillRatio   float64
-	FillRatio      float64
-	ExpandRatio    float64
-	ColPerm        []int
-	ColPermBase    int
-
-	UserColPerm     []int
-	UserColPermBase int
+func (opts *options) String() string {
+	return fmt.Sprintf("piv pol=%d piv_thr=%v drop_thr=%v col_fill_rt=%v",
+		opts.pivotPolicy, opts.pivotThreshold, opts.dropThreshold, opts.colFillRatio)
 }
 
-func NewGP() *GP {
-	return &GP{
-		PivotPolicy:    1,
-		PivotThreshold: 1,
-		DropThreshold:  0,  // do not drop
-		ColFillRatio:   -1, // do not limit column fill ratio
-		FillRatio:      4,
-		ExpandRatio:    1.2,
-		ColPerm:        nil,
-		ColPermBase:    0,
+type optFunc func(*options) error
+
+// WithoutPivoting disables pivoting.
+func WithoutPivoting() optFunc {
+	return func(opts *options) error {
+		opts.pivotPolicy = noPivoting
+		return nil
 	}
 }
 
+// PartialPivoting enables partial pivoting. Default.
+func PartialPivoting() optFunc {
+	return func(opts *options) error {
+		opts.pivotPolicy = partialPivoting
+		return nil
+	}
+}
+
+// ThresholdPivoting enables threshold pivoting.
+func ThresholdPivoting() optFunc {
+	return func(opts *options) error {
+		opts.pivotPolicy = thresholdPivoting
+		return nil
+	}
+}
+
+func DropThreshold(dropThreshold float64) optFunc {
+	return func(opts *options) error {
+		opts.dropThreshold = dropThreshold
+		if dropThreshold == 0 {
+			if Logger != nil {
+				fmt.Fprint(Logger, "zero drop threshold, pivoting disabled")
+			}
+			opts.pivotPolicy = noPivoting
+		}
+		return nil
+	}
+}
+
+// ColFillRatio sets the column fill ratio. If < 0 the column
+// fill ratio is not limited. Default value is -1.
+func ColFillRatio(colFillRatio float64) optFunc {
+	return func(opts *options) error {
+		opts.colFillRatio = colFillRatio
+		return nil
+	}
+}
+
+// FillRatio sets the ratio of the initial LU size to NNZ.
+// Default value is 4.
+func FillRatio(fillRatio float64) optFunc {
+	return func(opts *options) error {
+		opts.fillRatio = fillRatio
+		return nil
+	}
+}
+
+// ExpandRatio sets the ratio for LU size growth.
+// Default value is 1.2.
+func ExpandRatio(expandRatio float64) optFunc {
+	return func(opts *options) error {
+		opts.expandRatio = expandRatio
+		return nil
+	}
+}
+
+// ColPerm sets the column permutation vector.
+func ColPerm(colPerm []int) optFunc {
+	return func(opts *options) error {
+		opts.colPerm = colPerm
+		return nil
+	}
+}
+
+// LU is the LU decomposition resulting from symbolic factorization.
 type LU struct {
 	luSize   int
 	luNZ     []float64
@@ -53,57 +122,63 @@ type LU struct {
 	colPerm []int
 }
 
-func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
-	//var lu *LU
-
-	var pivtRow, origRow, thisCol, othrCol int
-
-	// Extract data from gp object.
-	if gp == nil {
-		return nil, fmt.Errorf("gp must not be nil")
+func DGSTRF(nA int, rowindA, colptrA []int, nzA []float64, optionFuncs ...optFunc) (*LU, error) {
+	var (
+		nrow = nA
+		ncol = nA
+		nnzA = len(nzA)
+	)
+	if nnzA > nA*nA {
+	}
+	if len(rowindA) != len(nzA) {
+	}
+	if len(colptrA) != ncol+1 {
 	}
 
-	pivotPolicy := gp.PivotPolicy
-	pivotThreshold := gp.PivotThreshold
-	dropThreshold := gp.DropThreshold
-	colFillRatio := gp.ColFillRatio
-	fillRatio := gp.FillRatio
-	expandRatio := gp.ExpandRatio
-	userColPerm := gp.UserColPerm
-	userColPermBase := gp.UserColPermBase
+	opts := &options{
+		pivotPolicy:    partialPivoting,
+		pivotThreshold: 1,
+		dropThreshold:  0,  // do not drop
+		colFillRatio:   -1, // do not limit column fill ratio
+		fillRatio:      4,
+		expandRatio:    1.2,
+	}
+	for _, optionFunc := range optionFuncs {
+		err := optionFunc(opts)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	fmt.Printf("piv pol=%d piv_thr=%v drop_thr=%v col_fill_rt=%v\n", pivotPolicy, pivotThreshold, dropThreshold, colFillRatio)
-
-	//PivotThreshold = 0.001
-	//if PivotThreshold == 0.0 { PivotPolicy = 0 } // no pivoting
-	//PivotPolicy = 0 // no pivoting
+	if Logger != nil {
+		fmt.Fprintf(Logger, "%v", opts)
+	}
 
 	// If a column permutation is specified, it must be a length ncol permutation.
-	if gp.UserColPerm != nil && len(gp.UserColPerm) != ncol {
-		//*info = -1
-		//goto free_and_exit
-		return nil, fmt.Errorf("column permutation (%v) must be a length ncol %v", len(gp.UserColPerm), ncol)
+	if opts.colPerm != nil {
+		if len(opts.colPerm) != ncol {
+			//*info = -1
+			//goto free_and_exit
+			return nil, fmt.Errorf("column permutation (%v) must be a length ncol %v", len(opts.colPerm), ncol)
+		}
+		for _, v := range opts.colPerm {
+			if v < 0 || v >= ncol {
+				return nil, fmt.Errorf("column permutation %v out of range [0,%d)", v, ncol)
+			}
+		}
 	}
-
-	// Extract data from a's array descriptor.
-	//a_m := descA.m
-	nA := descA.n
-	nnzA := descA.nnz
-	baseA := descA.base
-	colptrA := descA.colptr
-	rowindA := descA.rowind
 
 	// Convert the descriptor to 1-base if necessary.
-	if baseA == 0 {
-		for jcol := 0; jcol < nA+1; jcol++ {
-			colptrA[jcol]++
-		}
-		for jcol := 0; jcol < nnzA; jcol++ {
-			rowindA[jcol]++
-		}
-		descA.base = 1
-		baseA = 1
+	//if baseA == 0 {
+	for jcol := 0; jcol < nA+1; jcol++ {
+		colptrA[jcol]++
 	}
+	for jcol := 0; jcol < nnzA; jcol++ {
+		rowindA[jcol]++
+	}
+	//descA.base = 1
+	//baseA = 1
+	//}
 
 	// Allocate work arrays.
 	rwork := make([]float64, nrow)
@@ -114,7 +189,7 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 	pattern := make([]int, nrow)
 
 	// Create lu structure.
-	luSize := int(float64(nnzA) * fillRatio)
+	luSize := int(float64(nnzA) * opts.fillRatio)
 	lu := &LU{
 		luSize:   luSize,
 		luNZ:     make([]float64, luSize),
@@ -138,7 +213,9 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 
 	for jcol := 0; jcol < ncol; jcol++ {
 		if cmatch[jcol] == 0 {
-			fmt.Printf("Warning: Perfect matching not found\n")
+			if Logger != nil {
+				fmt.Fprintf(Logger, "warning: perfect matching not found")
+			}
 			break
 		}
 	}
@@ -155,38 +232,46 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 	//lasta := colptrA[ncol] - 1
 	lu.uColPtr[0] = 1
 
-	ifill(pattern, nrow, 0)
-	ifill(found, nrow, 0)
-	rfill(rwork, nrow, 0)
+	//ifill(pattern, nrow, 0)
+	//ifill(found, nrow, 0)
+	//rfill(rwork, nrow, 0)
 	ifill(lu.rowPerm, nrow, 0)
 
-	if userColPerm == nil {
+	if opts.colPerm == nil {
 		for jcol := 0; jcol < ncol; jcol++ {
 			lu.colPerm[jcol] = jcol + 1
 		}
 	} else {
-		fmt.Printf("UserColPermBase = %d\n", userColPermBase)
+		//fmt.Printf("UserColPermBase = %d\n", userColPermBase)
 		for jcol := 0; jcol < ncol; jcol++ {
-			lu.colPerm[jcol] = userColPerm[jcol] + (1 - userColPermBase)
+			//lu.colPerm[jcol] = userColPerm[jcol] + (1 - userColPermBase)
+			lu.colPerm[jcol] = opts.colPerm[jcol] + 1
 		}
 	}
 
 	// Compute one column at a time.
 	for jcol := 1; jcol <= ncol; jcol++ {
-
 		// Mark pointer to new column, ensure it is large enough.
 		if lastlu+nrow >= lu.luSize {
-			newSize := int(float64(lu.luSize) * expandRatio)
+			newSize := int(float64(lu.luSize) * opts.expandRatio)
 
-			//fmt.Fprintf(os.Stderr, "expanding to %d nonzeros...\n", newSize)
+			if Logger != nil {
+				fmt.Fprintf(Logger, "expanding LU to %d nonzeros", newSize)
+			}
 
-			lu.luNZ = make([]float64, newSize) // FIXME: realloc
-			lu.luRowInd = make([]int, newSize)
+			luNZ := make([]float64, newSize)
+			copy(luNZ, lu.luNZ)
+			lu.luNZ = luNZ
+
+			luRowInd := make([]int, newSize)
+			copy(luRowInd, lu.luRowInd)
+			lu.luRowInd = luRowInd
 
 			lu.luSize = newSize
 		}
 
 		// Set up nonzero pattern.
+		var origRow, thisCol int
 		{
 			jjj := lu.colPerm[jcol-1]
 			for i := colptrA[jjj-1]; i < colptrA[jjj]; i++ {
@@ -233,10 +318,10 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 		// Copy the dense vector into the sparse data structure, find the
 		// diagonal element (pivoting if specified), and divide the
 		// column of L by it.
-		nzCountLimit := int(colFillRatio * (float64(colptrA[thisCol] - colptrA[thisCol-1] + 1)))
+		nzCountLimit := int(opts.colFillRatio * (float64(colptrA[thisCol] - colptrA[thisCol-1] + 1)))
 
-		zpivot, err := lucopy(pivotPolicy, pivotThreshold, dropThreshold, nzCountLimit,
-			jcol, ncol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
+		zpivot, err := lucopy(opts.pivotPolicy, opts.pivotThreshold, opts.dropThreshold,
+			nzCountLimit, jcol, ncol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
 			lu.rowPerm, lu.colPerm, rwork, pattern, twork)
 		if err != nil {
 			return nil, err
@@ -253,8 +338,8 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 
 			pattern[origRow-1] = 0
 
-			pivtRow = zpivot
-			othrCol = rmatch[pivtRow-1]
+			pivtRow := zpivot
+			othrCol := rmatch[pivtRow-1]
 
 			cmatch[thisCol-1] = pivtRow
 			cmatch[othrCol-1] = origRow
@@ -266,7 +351,7 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 
 		// If there are no diagonal elements after this column, change the pivot mode.
 		if jcol == nrow {
-			pivotPolicy = -1
+			opts.pivotPolicy = stopPivoting
 		}
 	}
 
@@ -313,26 +398,19 @@ func DGSTRF(gp *GP, nrow, ncol int, nzA []float64, descA *Desc) (*LU, error) {
 	return lu, nil
 }
 
-func DGSTRS(gp *GP, trans string, n, nrhs int, lu *LU /*ia, ja int,*/, b []float64 /*, ib, jb int*/) error {
-	var rwork []float64
-
-	if gp == nil {
-		return fmt.Errorf("gp must not be nil")
-	}
+func DGSTRS(trans bool, n, nrhs int, lu *LU, b []float64) error {
 	if nrhs != 1 {
 		return fmt.Errorf("nrhs must be 1")
 	}
 
-	rwork = make([]float64, n)
+	rwork := make([]float64, n)
 
-	if strings.ToUpper(trans) == "N" {
+	if !trans {
 		lsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, rwork)
 		usolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, rwork, b)
-	} else if strings.ToUpper(trans) == "T" {
+	} else {
 		utsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, rwork)
 		ltsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, rwork, b)
-	} else {
-		return fmt.Errorf("trans %q must be N or T", trans)
 	}
 
 	return nil

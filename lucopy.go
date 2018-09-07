@@ -46,7 +46,7 @@ import (
 //
 // Output variable:
 //   zpivot                 > 0 for success (pivot row), -1 for zero pivot element.
-func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
+func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 	jcol, ncol int, lastlu *int, lu []float64, lurow, lcolst, ucolst []int,
 	rperm, cperm []int, dense []float64, pattern []int, twork []float64) (int, error) {
 	// Local variables:
@@ -66,7 +66,7 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 	// the diagonal element.
 	ujjptr := 0
 
-	if pivot <= 0 {
+	if pivot == noPivoting || pivot == stopPivoting {
 		// No pivoting, diagonal element has irow = jcol.
 		// Copy the column elements of U and L, throwing out zeros.
 
@@ -112,7 +112,7 @@ func lucopy(pivot int, pthresh, dthresh float64, nzcount int,
 		ucolst[jcol+1-off] = nzcpy
 		*lastlu = nzcpy - 1
 
-		if pivot == -1 {
+		if pivot == stopPivoting {
 			zpivot := 0 //pivrow
 			return zpivot, nil
 		}

@@ -3,6 +3,8 @@
 
 package lufact
 
+const off int = 1
+
 // lusolv solves a square linear system, given an LU factorization.
 //
 // Solve for X in a square linear system Ax = b, given the factorization

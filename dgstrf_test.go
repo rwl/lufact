@@ -3,7 +3,10 @@
 
 package lufact
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestDGSTRFS(t *testing.T) {
 	var (
@@ -21,29 +24,34 @@ func TestDGSTRFS(t *testing.T) {
 		permC[i] = i
 	}
 
-	descA := &Desc{
-		//Type: CSC,
-		m:      cols, // transpose
-		n:      rows,
-		nnz:    len(a),
-		base:   0,
-		rowind: arow,
-		colptr: acolst,
-	}
+	//descA := &Desc{
+	//	//Type: CSC,
+	//	m:      cols, // transpose
+	//	n:      rows,
+	//	nnz:    len(a),
+	//	base:   0,
+	//	rowind: arow,
+	//	colptr: acolst,
+	//}
+	//gp := defaultOptions()
+	//gp.ColPerm = permC
 
-	gp := NewGP()
-	gp.ColPerm = permC
-	gp.UserColPerm = []int{6, 5, 2, 4, 1, 9, 7, 8, 0, 3}
+	//userColPerm := []int{6, 5, 2, 4, 1, 9, 7, 8, 0, 3}
 
-	lu, err := DGSTRF(gp, rows, cols, a, descA)
+	lu, err := DGSTRF(rows, arow, acolst, a, ColPerm(permC))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = DGSTRS(gp, "T", len(b), 1, lu, b)
+	err = DGSTRS('T', len(b), 1, lu, b)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Logf("%v", b)
+	for i, x := range b {
+		expect := float64(i+1) / 10
+		if math.Abs(x-expect) > 1e-12 {
+			t.Errorf("x[%d], expected %v actual %v", i, expect, x)
+		}
+	}
 }

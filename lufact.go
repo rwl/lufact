@@ -5,8 +5,6 @@ package lufact
 
 import "fmt"
 
-const off int = 1
-
 // lufact provides sparse LU factorization with partial pivoting.
 //
 // Given a matrix A in sparse format by columns, perform an LU
@@ -89,7 +87,7 @@ const off int = 1
 //   overwr  set to .true. if A and LU as given are equivalent arrays
 //   xa      starting index of nonzeros in A/AROW (initially 1)
 //   zpivot  set to .true. if a zero pivot is found by lucopy()
-func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a []float64, arow []int, acolst []int,
+func lufact(pivot pivotPolicy, pivotThreshold, dropThreshold float64, nrow, ncol int, a []float64, arow []int, acolst []int,
 	maxlu int, lastlu *int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int) error {
 
 	var nzCount int
@@ -113,7 +111,7 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 
 	ifill(rperm, nrow, 0)
 
-	if pivot == 2 {
+	if pivot == thresholdPivoting {
 		cntrow(arow, lasta, rowcnt)
 	}
 
@@ -170,7 +168,7 @@ func lufact(pivot int, pivotThreshold, dropThreshold float64, nrow, ncol int, a 
 		// If there are no diagonal elements after this column, change the pivot mode.
 
 		if jcol == nrow {
-			locpiv = -1
+			locpiv = stopPivoting
 		}
 		//l200:
 	}
