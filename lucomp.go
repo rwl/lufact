@@ -37,7 +37,7 @@ package gp
 //
 //           Both dense and found are indexed according to the row
 //           numbering of A, not PA.
-func lucomp(jcol int, lastlu *int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, dense []float64, found /*, pattern*/ []int /*, flops float64*/) {
+func lucomp(jcol int, lastlu *int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, dense []float64, found, pattern []int) {
 	// Local variables:
 	//   nzuptr                pointer to current nonzero PtU(krow,jcol).
 	//   nzuend, nnzu, nzuind  used to compute nzuptr.
@@ -70,12 +70,11 @@ func lucomp(jcol int, lastlu *int, lu []float64, lurow, lcolst, ucolst, rperm, c
 			nzlst := lcolst[kcol-off]
 			nzlend := ucolst[kcol+1-off] - 1
 			if nzlend < nzlst {
-				ucolst[jcol+1-off] = *lastlu + 1
-				return
+				continue
 			}
 			for nzlptr := nzlst; nzlptr <= nzlend; nzlptr++ {
 				irow := lurow[nzlptr-off]
-				dense[irow-off] = dense[irow-off] - ukj*lu[nzlptr-off]
+				dense[irow-off] -= ukj * lu[nzlptr-off]
 
 				// If this is a new nonzero in L, allocate storage for it.
 				if found[irow-off] != jcol {

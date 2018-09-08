@@ -33,8 +33,7 @@ import "fmt"
 //                             column "col"
 //                           = 0       means "col" is an unmatched
 //                                     node.
-func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, nxtchp, rowset, colset []int) error {
-
+func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, nxtchp []int) (rowset []int, colset []int, err error) {
 	// Working variables :
 	//
 	//     prevrw (ncols) -- pointer toward the root of the depth-first
@@ -54,8 +53,11 @@ func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, 
 	//                       the cheap assignment.  set to -1 when
 	//                       all rows have been considered for
 	//                       cheap assignment
+	var row, prow, pcol, nextrw, lastrw int
 
-	var row int
+	rowset = make([]int, nrows)
+	colset = make([]int, ncols)
+
 	for nodec := 1; nodec <= ncols; nodec++ {
 		// Initialize node 'col' as the root of the path.
 		col := nodec
@@ -65,8 +67,8 @@ func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, 
 		// Main loop begins here. Each time through, try to find a
 		// cheap assignment from node col.
 	l100:
-		nextrw := nxtchp[col-off]
-		lastrw := colstr[col+1-off] - 1
+		nextrw = nxtchp[col-off]
+		lastrw = colstr[col+1-off] - 1
 
 		if nextrw > 0 {
 			for xrow := nextrw; xrow <= lastrw; xrow++ {
@@ -104,9 +106,11 @@ func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, 
 					nxtcol := rowset[row-off]
 
 					if nxtcol < 0 {
-						return fmt.Errorf("maxmatch : search reached a forbidden column")
+						err = fmt.Errorf("maxmatch: search reached a forbidden column")
+						return
 					} else if nxtcol == col {
-						return fmt.Errorf("maxmatch : search followed a matching edge")
+						err = fmt.Errorf("maxmatch: search followed a matching edge")
+						return
 					} else if nxtcol > 0 {
 
 						// The forward step led to a matched row
@@ -125,7 +129,7 @@ func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, 
 					}
 
 				}
-				//l300:
+				//l300: continue
 			}
 		}
 
@@ -143,13 +147,14 @@ func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, 
 		// edge backward toward the root.
 	l400:
 		rowset[row-off] = col
-		prow := prevrw[col-off]
-		pcol := prevcl[col-off]
+		prow = prevrw[col-off]
+		pcol = prevcl[col-off]
 
 	l500:
 		if pcol > 0 {
 			if rowset[prow-off] != col {
-				return fmt.Errorf("maxmatch : pointer toward root disagrees with matching. prevcl[%v]=%v but colset[%v]=%v", col, row, row, rowset[row-off])
+				err = fmt.Errorf("maxmatch: pointer toward root disagrees with matching. prevcl[%v]=%v but colset[%v]=%v", col, row, row, rowset[row-off])
+				return
 			}
 			rowset[prow-off] = pcol
 			col = pcol
@@ -157,8 +162,10 @@ func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, 
 			pcol = prevcl[pcol-off]
 			goto l500
 		}
+	l600:
+		continue
 	}
-l600:
+
 	// Compute the matching from the view of column nodes.
 	for row := 1; row <= nrows; row++ {
 		col := rowset[row-off]
@@ -166,5 +173,5 @@ l600:
 			colset[col-off] = row
 		}
 	}
-	return nil
+	return
 }

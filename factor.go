@@ -16,7 +16,7 @@ var Logger io.Writer
 type pivotPolicy int
 
 const (
-	stopPivoting      pivotPolicy = -1
+	noDiagonalElement pivotPolicy = -1
 	noPivoting        pivotPolicy = 0
 	partialPivoting   pivotPolicy = 1
 	thresholdPivoting pivotPolicy = 2
@@ -37,10 +37,10 @@ func (opts *options) String() string {
 		opts.pivotPolicy, opts.pivotThreshold, opts.dropThreshold, opts.colFillRatio)
 }
 
-type optFunc func(*options) error
+type OptFunc func(*options) error
 
 // WithoutPivoting disables pivoting.
-func WithoutPivoting() optFunc {
+func WithoutPivoting() OptFunc {
 	return func(opts *options) error {
 		opts.pivotPolicy = noPivoting
 		return nil
@@ -50,7 +50,7 @@ func WithoutPivoting() optFunc {
 // PartialPivoting enables partial pivoting. Enabled by default.
 // pivotThreshold is the fraction of max pivot candidate
 // acceptable for pivoting. Default value is 1.
-func PartialPivoting(pivotThreshold float64) optFunc {
+func PartialPivoting(pivotThreshold float64) OptFunc {
 	return func(opts *options) error {
 		opts.pivotPolicy = partialPivoting
 		opts.pivotThreshold = pivotThreshold
@@ -59,20 +59,10 @@ func PartialPivoting(pivotThreshold float64) optFunc {
 }
 
 // ThresholdPivoting enables threshold pivoting.
-//
-// For each major step of the algorithm, the pivot is chosen to
-// be a nonzero below the diagonal in the current column of A
-// with the most nonzeros to the right in its row, with absolute
-// value at least dropThreshold*maxpiv, where maxpiv is the
-// largest absolute value below the diagonal in the current column.
-// Note that if dropThreshold <= 0.0, then the pivot is chosen
-// purely on the basis of row sparsity. Also, if
-// dropThreshold >= 1.0, then the pivoting is effectively partial
-// pivoting with ties broken on the basis of sparsity.
-func ThresholdPivoting(dropThreshold float64) optFunc {
+func ThresholdPivoting( /*dropThreshold float64*/ ) OptFunc {
 	return func(opts *options) error {
 		opts.pivotPolicy = thresholdPivoting
-		opts.dropThreshold = dropThreshold
+		//opts.dropThreshold = dropThreshold
 		//if dropThreshold == 0 {
 		//	if Logger != nil {
 		//		fmt.Fprint(Logger, "zero drop threshold, pivoting disabled")
@@ -83,9 +73,27 @@ func ThresholdPivoting(dropThreshold float64) optFunc {
 	}
 }
 
+// DropThreshold sets drop tolerance.
+//
+// For each major step of the algorithm, the pivot is chosen to
+// be a nonzero below the diagonal in the current column of A
+// with the most nonzeros to the right in its row, with absolute
+// value at least dropThreshold*maxpiv, where maxpiv is the
+// largest absolute value below the diagonal in the current column.
+// Note that if dropThreshold <= 0.0, then the pivot is chosen
+// purely on the basis of row sparsity. Also, if
+// dropThreshold >= 1.0, then the pivoting is effectively partial
+// pivoting with ties broken on the basis of sparsity.
+func DropThreshold(dropThreshold float64) OptFunc {
+	return func(opts *options) error {
+		opts.dropThreshold = dropThreshold
+		return nil
+	}
+}
+
 // ColFillRatio sets the column fill ratio. If < 0 the column
 // fill ratio is not limited. Default value is -1.
-func ColFillRatio(colFillRatio float64) optFunc {
+func ColFillRatio(colFillRatio float64) OptFunc {
 	return func(opts *options) error {
 		opts.colFillRatio = colFillRatio
 		return nil
@@ -94,7 +102,7 @@ func ColFillRatio(colFillRatio float64) optFunc {
 
 // FillRatio sets the ratio of the initial LU size to NNZ.
 // Default value is 4.
-func FillRatio(fillRatio float64) optFunc {
+func FillRatio(fillRatio float64) OptFunc {
 	return func(opts *options) error {
 		opts.fillRatio = fillRatio
 		return nil
@@ -103,8 +111,11 @@ func FillRatio(fillRatio float64) optFunc {
 
 // ExpandRatio sets the ratio for LU size growth.
 // Default value is 1.2.
-func ExpandRatio(expandRatio float64) optFunc {
+func ExpandRatio(expandRatio float64) OptFunc {
 	return func(opts *options) error {
+		if expandRatio <= 1 {
+			return fmt.Errorf("expand ratio (%v) must be > 1", expandRatio)
+		}
 		opts.expandRatio = expandRatio
 		return nil
 	}
@@ -112,7 +123,7 @@ func ExpandRatio(expandRatio float64) optFunc {
 
 // ColPerm sets the column permutation vector.
 // If nil natural ordering will be used.
-func ColPerm(colPerm []int) optFunc {
+func ColPerm(colPerm []int) OptFunc {
 	return func(opts *options) error {
 		opts.colPerm = colPerm
 		return nil
@@ -140,7 +151,7 @@ type LU struct {
 // factorization is PA = LU, where L and U are triangular. P, L, and U
 // are returned.  This subroutine uses the Coleman-Gilbert-Peierls
 // algorithm, in which total time is O(nonzero multiplications).
-func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) (*LU, error) {
+func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...OptFunc) (*LU, error) {
 	var (
 		nrow = nA
 		ncol = nA
@@ -221,11 +232,9 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 
 	// Compute max matching. We use elements of the lu structure
 	// for all the temporary arrays needed.
-	cmatch := make([]int, ncol)
-	rmatch := make([]int, nrow)
 
-	err := maxmatch(nrow, ncol, colptrA, rowindA, lu.lColPtr, lu.uColPtr,
-		lu.rowPerm, lu.colPerm, lu.luRowInd, rmatch, cmatch)
+	rmatch, cmatch, err := maxmatch(nrow, ncol, colptrA, rowindA,
+		lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, lu.luRowInd)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +257,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 	// If we are threshold pivoting, get row counts.
 	var lastlu = 0
 
+	localPivotPolicy := opts.pivotPolicy
 	//lasta := colptrA[ncol] - 1
 	lu.uColPtr[0] = 1
 
@@ -281,10 +291,12 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 			luNZ := make([]float64, newSize)
 			copy(luNZ, lu.luNZ)
 			lu.luNZ = luNZ
+			//lu.luNZ = append(lu.luNZ, make([]float64, newSize-lu.luSize)...)
 
 			luRowInd := make([]int, newSize)
 			copy(luRowInd, lu.luRowInd)
 			lu.luRowInd = luRowInd
+			//lu.luRowInd = append(lu.luRowInd, make([]int, newSize-lu.luSize)...)
 
 			lu.luSize = newSize
 		}
@@ -323,7 +335,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 		// vector, allocating storage for fill in L as necessary.
 
 		lucomp(jcol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
-			lu.rowPerm, lu.colPerm, rwork, found)
+			lu.rowPerm, lu.colPerm, rwork, found, pattern)
 
 		//if rwork[origRow-1] == 0.0 {
 		//	fmt.Printf("Warning: Matching to a zero\n")
@@ -339,14 +351,14 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 		// column of L by it.
 		nzCountLimit := int(opts.colFillRatio * (float64(colptrA[thisCol] - colptrA[thisCol-1] + 1)))
 
-		zpivot, err := lucopy(opts.pivotPolicy, opts.pivotThreshold, opts.dropThreshold,
+		zpivot, err := lucopy(localPivotPolicy, opts.pivotThreshold, opts.dropThreshold,
 			nzCountLimit, jcol, ncol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
 			lu.rowPerm, lu.colPerm, rwork, pattern, twork)
 		if err != nil {
 			return nil, err
 		}
 		if zpivot == -1 {
-			return nil, fmt.Errorf("jcol=%v", jcol)
+			return nil, fmt.Errorf("lucopy: jcol=%v", jcol)
 		}
 
 		{
@@ -370,7 +382,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 
 		// If there are no diagonal elements after this column, change the pivot mode.
 		if jcol == nrow {
-			opts.pivotPolicy = stopPivoting
+			localPivotPolicy = noDiagonalElement
 		}
 	}
 
@@ -378,7 +390,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 	// rows so the data structure represents L and U, not PtL and PtU.
 	jcol := ncol + 1
 	for i := 0; i < nrow; i++ {
-		if (lu.rowPerm)[i] == 0 {
+		if lu.rowPerm[i] == 0 {
 			lu.rowPerm[i] = jcol
 			jcol = jcol + 1
 		}
@@ -402,7 +414,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 
 	{
 		var ujj float64
-		minujj := math.Inf(0)
+		var minujj = math.Inf(1)
 
 		for jcol := 1; jcol <= ncol; jcol++ {
 			ujj = math.Abs(lu.luNZ[lu.lColPtr[jcol-1]-2])
@@ -411,13 +423,15 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...optFunc) 
 			}
 		}
 
-		//fmt.Printf(">>> last = %v, min = %v\n", ujj, minujj)
+		if Logger != nil {
+			fmt.Fprintf(Logger, ">>> last = %v, min = %v\n", ujj, minujj)
+		}
 	}
 
 	return lu, nil
 }
 
-// Solve Ax=b for one or more right-hand-side given the numeric
+// Solve Ax=b for one or more right-hand-sides given the numeric
 // factorization of A from Factor.
 func Solve(lu *LU, rhs [][]float64, trans bool) error {
 	if lu == nil {
@@ -425,7 +439,7 @@ func Solve(lu *LU, rhs [][]float64, trans bool) error {
 	}
 	n := lu.nA
 	if len(rhs) == 0 {
-		return fmt.Errorf("one or more RHS must be specified")
+		return fmt.Errorf("one or more rhs must be specified")
 	}
 	for i, b := range rhs {
 		if len(b) != n {

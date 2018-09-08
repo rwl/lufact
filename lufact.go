@@ -151,7 +151,7 @@ func lufact(pivot pivotPolicy, pivotThreshold, dropThreshold float64, nrow, ncol
 		// Compute the values of column jcol of L and U in the dense
 		// vector, allocating storage for fill in L as necessary.
 
-		lucomp(jcol, lastlu, lu, lurow, lcolst, ucolst, rperm, cperm, rwork, found)
+		lucomp(jcol, lastlu, lu, lurow, lcolst, ucolst, rperm, cperm, rwork, found, nil)
 
 		// Copy the dense vector into the sparse data structure, find the
 		// diagonal element (pivoting if specified), and divide the
@@ -168,7 +168,7 @@ func lufact(pivot pivotPolicy, pivotThreshold, dropThreshold float64, nrow, ncol
 		// If there are no diagonal elements after this column, change the pivot mode.
 
 		if jcol == nrow {
-			locpiv = stopPivoting
+			locpiv = noDiagonalElement
 		}
 		//l200:
 	}

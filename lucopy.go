@@ -66,7 +66,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 	// the diagonal element.
 	ujjptr := 0
 
-	if pivot == noPivoting || pivot == stopPivoting {
+	if pivot == noPivoting || pivot == noDiagonalElement {
 		// No pivoting, diagonal element has irow = jcol.
 		// Copy the column elements of U and L, throwing out zeros.
 
@@ -112,7 +112,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 		ucolst[jcol+1-off] = nzcpy
 		*lastlu = nzcpy - 1
 
-		if pivot == stopPivoting {
+		if pivot == noDiagonalElement {
 			zpivot := 0 //pivrow
 			return zpivot, nil
 		}
@@ -178,7 +178,6 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 			} else {
 				ldthreshabs = 0.0
 			}
-
 		}
 
 		// Copy the column elements of U, throwing out zeros.
