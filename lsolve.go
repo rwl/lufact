@@ -25,35 +25,35 @@ func lsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, x
 	if n <= 0 {
 		return fmt.Errorf("lsolve called with nonpositive n = %v", n)
 	}
+	/*
+		// Check that rperm is really a permutation.
+		for i := 1; i <= n; i++ {
+			x[i-off] = 0
+		}
+		for i := 1; i <= n; i++ {
+			if rperm[i-off] < 1 || rperm[i-off] > n {
+				return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i-off])
+			}
+			if x[rperm[i-off]] != 0 {
+				return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i-off])
+			}
+			x[rperm[i-off]-off] = 1
+		}
 
-	// Check that rperm is really a permutation.
-	for i := 1; i <= n; i++ {
-		x[i-off] = 0
-	}
-	for i := 1; i <= n; i++ {
-		if rperm[i-off] < 1 || rperm[i-off] > n {
-			return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i-off])
+		// Check that cperm is really a permutation.
+		for i := 1; i <= n; i++ {
+			x[i-off] = 0
 		}
-		if x[rperm[i-off]] != 0 {
-			return fmt.Errorf("lsolve, rpermutation is illegal in position i = %v", rperm[i-off])
+		for i := 1; i <= n; i++ {
+			if cperm[i-off] < 1 || cperm[i-off] > n {
+				return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i-off])
+			}
+			if x[cperm[i-off]-off] != 0 {
+				return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i-off])
+			}
+			x[cperm[i-off]-off] = 1
 		}
-		x[rperm[i-off]-off] = 1
-	}
-
-	// Check that cperm is really a permutation.
-	for i := 1; i <= n; i++ {
-		x[i-off] = 0
-	}
-	for i := 1; i <= n; i++ {
-		if cperm[i-off] < 1 || cperm[i-off] > n {
-			return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i-off])
-		}
-		if x[cperm[i-off]-off] != 0 {
-			return fmt.Errorf("lsolve, cpermutation is illegal in position i = %v", cperm[i-off])
-		}
-		x[cperm[i-off]-off] = 1
-	}
-
+	*/
 	// Solve the system.
 	for i := 1; i <= n; i++ {
 		x[rperm[i-off]-off] = b[i-off]
