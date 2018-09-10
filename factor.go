@@ -151,17 +151,20 @@ type LU struct {
 // factorization is PA = LU, where L and U are triangular. P, L, and U
 // are returned.  This subroutine uses the Coleman-Gilbert-Peierls
 // algorithm, in which total time is O(nonzero multiplications).
-func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...OptFunc) (*LU, error) {
+func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*LU, error) {
 	var (
 		nrow = nA
 		ncol = nA
 		nnzA = len(nzA)
 	)
 	if nnzA > nA*nA {
+		return nil, fmt.Errorf("nnz (%v) must be < n*n (%v)", nnzA, nA*nA)
 	}
-	if len(rowindA) != len(nzA) {
+	if len(rowind) != len(nzA) {
+		return nil, fmt.Errorf("len rowind (%v) must be nnz (%v)", len(rowind), len(nzA))
 	}
-	if len(colptrA) != ncol+1 {
+	if len(colptr) != ncol+1 {
+		return nil, fmt.Errorf("len colptr (%v) must be ncol+1 (%v)", len(colptr), ncol+1)
 	}
 
 	opts := &options{
@@ -180,7 +183,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...OptFunc) 
 	}
 
 	if Logger != nil {
-		fmt.Fprintf(Logger, "%v", opts)
+		fmt.Fprintf(Logger, "%v\n", opts)
 	}
 
 	// If a column permutation is specified, it must be a length ncol permutation.
@@ -198,12 +201,14 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...OptFunc) 
 	}
 
 	// Convert the descriptor to 1-base if necessary.
+	colptrA := make([]int, nA+1)
+	rowindA := make([]int, nnzA)
 	//if baseA == 0 {
 	for jcol := 0; jcol < nA+1; jcol++ {
-		colptrA[jcol]++
+		colptrA[jcol] = colptr[jcol] + 1
 	}
 	for jcol := 0; jcol < nnzA; jcol++ {
-		rowindA[jcol]++
+		rowindA[jcol] = rowind[jcol] + 1
 	}
 	//descA.base = 1
 	//baseA = 1
@@ -242,7 +247,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...OptFunc) 
 	for jcol := 0; jcol < ncol; jcol++ {
 		if cmatch[jcol] == 0 {
 			if Logger != nil {
-				fmt.Fprintf(Logger, "warning: perfect matching not found")
+				fmt.Fprintf(Logger, "warning: perfect matching not found\n")
 			}
 			break
 		}
@@ -285,7 +290,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...OptFunc) 
 			newSize := int(float64(lu.luSize) * opts.expandRatio)
 
 			if Logger != nil {
-				fmt.Fprintf(Logger, "expanding LU to %d nonzeros", newSize)
+				fmt.Fprintf(Logger, "expanding LU to %d nonzeros\n", newSize)
 			}
 
 			luNZ := make([]float64, newSize)
@@ -424,7 +429,7 @@ func Factor(nA int, rowindA, colptrA []int, nzA []float64, optFuncs ...OptFunc) 
 		}
 
 		if Logger != nil {
-			fmt.Fprintf(Logger, ">>> last = %v, min = %v\n", ujj, minujj)
+			fmt.Fprintf(Logger, "last = %v, min = %v\n", ujj, minujj)
 		}
 	}
 
