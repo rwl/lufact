@@ -3,7 +3,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gpd
+package gpz
 
 import "fmt"
 

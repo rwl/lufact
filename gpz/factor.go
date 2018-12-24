@@ -3,13 +3,14 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gpd
+package gpz
 
 import (
 	"errors"
 	"fmt"
 	"io"
 	"math"
+	"math/cmplx"
 )
 
 // Logger is a writer used for logging messages.
@@ -135,7 +136,7 @@ func ColPerm(colPerm []int) OptFunc {
 // LU is a lower-upper numeric factorization.
 type LU struct {
 	luSize   int
-	luNZ     []float64
+	luNZ     []complex128
 	luRowInd []int
 	lColPtr  []int
 	uColPtr  []int
@@ -153,7 +154,7 @@ type LU struct {
 // factorization is PA = LU, where L and U are triangular. P, L, and U
 // are returned.  This subroutine uses the Coleman-Gilbert-Peierls
 // algorithm, in which total time is O(nonzero multiplications).
-func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*LU, error) {
+func Factor(nA int, rowind, colptr []int, nzA []complex128, optFuncs ...OptFunc) (*LU, error) {
 	var (
 		nrow = nA
 		ncol = nA
@@ -217,7 +218,7 @@ func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*
 	//}
 
 	// Allocate work arrays.
-	rwork := make([]float64, nrow)
+	rwork := make([]complex128, nrow)
 	twork := make([]float64, nrow)
 	found := make([]int, nrow)
 	child := make([]int, nrow)
@@ -228,7 +229,7 @@ func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*
 	luSize := int(float64(nnzA) * opts.fillRatio)
 	lu := &LU{
 		luSize:   luSize,
-		luNZ:     make([]float64, luSize),
+		luNZ:     make([]complex128, luSize),
 		luRowInd: make([]int, luSize),
 		uColPtr:  make([]int, ncol+1),
 		lColPtr:  make([]int, ncol),
@@ -295,10 +296,10 @@ func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*
 				fmt.Fprintf(Logger, "expanding LU to %d nonzeros\n", newSize)
 			}
 
-			luNZ := make([]float64, newSize)
+			luNZ := make([]complex128, newSize)
 			copy(luNZ, lu.luNZ)
 			lu.luNZ = luNZ
-			//lu.luNZ = append(lu.luNZ, make([]float64, newSize-lu.luSize)...)
+			//lu.luNZ = append(lu.luNZ, make([]complex128, newSize-lu.luSize)...)
 
 			luRowInd := make([]int, newSize)
 			copy(luRowInd, lu.luRowInd)
@@ -424,7 +425,7 @@ func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*
 		var minujj = math.Inf(1)
 
 		for jcol := 1; jcol <= ncol; jcol++ {
-			ujj = math.Abs(lu.luNZ[lu.lColPtr[jcol-1]-2])
+			ujj = cmplx.Abs(lu.luNZ[lu.lColPtr[jcol-1]-2])
 			if ujj < minujj {
 				minujj = ujj
 			}
@@ -438,7 +439,7 @@ func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*
 
 // Solve Ax=b for one or more right-hand-sides given the numeric
 // factorization of A from Factor.
-func Solve(lu *LU, rhs [][]float64, trans bool) error {
+func Solve(lu *LU, rhs [][]complex128, trans bool) error {
 	if lu == nil {
 		return errors.New("lu must not be nil")
 	}
@@ -451,7 +452,7 @@ func Solve(lu *LU, rhs [][]float64, trans bool) error {
 			return fmt.Errorf("len b[%d] (%v) must equal ord(A) (%v)", i, len(b), n)
 		}
 	}
-	work := make([]float64, n)
+	work := make([]complex128, n)
 
 	for _, b := range rhs {
 		if !trans {

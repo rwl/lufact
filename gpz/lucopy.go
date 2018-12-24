@@ -3,11 +3,11 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gpd
+package gpz
 
 import (
 	"fmt"
-	"math"
+	"math/cmplx"
 )
 
 // lucopy copies dense column to sparse structure, pivot, and divide.
@@ -49,8 +49,8 @@ import (
 // Output variable:
 //   zpivot                 > 0 for success (pivot row), -1 for zero pivot element.
 func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
-	jcol, ncol int, lastlu *int, lu []float64, lurow, lcolst, ucolst []int,
-	rperm, cperm []int, dense []float64, pattern []int, twork []float64) (int, error) {
+	jcol, ncol int, lastlu *int, lu []complex128, lurow, lcolst, ucolst []int,
+	rperm, cperm []int, dense []complex128, pattern []int, twork []float64) (int, error) {
 	// Local variables:
 	//   nzptr       Index into lurow of current nonzero.
 	//   nzst, nzend Loop bounds for nzptr.
@@ -134,7 +134,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 			maxpivglb := -1.0
 			for nzptr := ucolst[jcol-off]; nzptr <= lcolst[jcol-off]-1; nzptr++ {
 				irow := lurow[nzptr-off]
-				utemp := math.Abs(dense[irow-off])
+				utemp := abs(dense[irow-off])
 				if utemp > maxpivglb {
 					maxpivglb = utemp
 				}
@@ -144,7 +144,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 			maxpivglb = -1.0
 			for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
 				irow := lurow[nzptr-off]
-				utemp := math.Abs(dense[irow-off])
+				utemp := abs(dense[irow-off])
 				if utemp > maxpivglb {
 					maxpivglb = utemp
 				}
@@ -155,7 +155,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 			for nzptr := ucolst[jcol-off]; nzptr <= lcolst[jcol-off]-1; nzptr++ {
 				i = i + 1
 				irow := lurow[nzptr-off]
-				utemp := math.Abs(dense[irow-off])
+				utemp := abs(dense[irow-off])
 				twork[i] = utemp
 			}
 			if nzcount < i {
@@ -170,7 +170,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 			for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
 				i = i + 1
 				irow := lurow[nzptr-off]
-				utemp := math.Abs(dense[irow-off])
+				utemp := abs(dense[irow-off])
 				twork[i-off] = utemp
 			}
 			if nzcount < i {
@@ -189,7 +189,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 				irow := lurow[nzptr-off]
 
 				//if (pattern(irow) .ne. 0 .or. pattern(irow) .eq. 2) then
-				if pattern[irow-off] != 0 || math.Abs(dense[irow-off]) >= udthreshabs {
+				if pattern[irow-off] != 0 || abs(dense[irow-off]) >= udthreshabs {
 					lurow[nzcpy-off] = irow
 					lu[nzcpy-off] = dense[irow-off]
 					dense[irow-off] = 0.0
@@ -219,7 +219,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 
 		for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
 			irow := lurow[nzptr-off]
-			utemp := math.Abs(dense[irow-off])
+			utemp := abs(dense[irow-off])
 
 			//if irow == cperm[jcol-off] {
 			if pattern[irow-off] == 2 {
@@ -264,7 +264,7 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 
 		for nzptr := lcolst[jcol-off]; nzptr <= ucolst[jcol+1-off]-1; nzptr++ {
 			irow := lurow[nzptr-off]
-			utemp := math.Abs(dense[irow-off])
+			utemp := abs(dense[irow-off])
 
 			//if irow == cperm[jcol-off] {
 			//   diagptr = nzcpy
@@ -341,4 +341,9 @@ func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
 
 	zpivot := pivrow
 	return zpivot, nil
+}
+
+func abs(a complex128) float64 {
+	return cmplx.Abs(a)
+	//return math.Sqrt(real(a)*real(a) + imag(a)*imag(a))
 }

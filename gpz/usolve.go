@@ -1,6 +1,9 @@
-{{.Header}}
+// Code generated on Mon Dec 24 2018. DO NOT EDIT.
 
-package {{.Package}}
+// Copyright 1988 John Gilbert and Tim Peierls
+// All rights reserved.
+
+package gpz
 
 import "fmt"
 
@@ -20,7 +23,7 @@ import "fmt"
 // Output parameter:
 //   x    Solution, as a dense n-vector.
 //   error 0 if successful, 1 otherwise
-func usolve(n int, lu []{{.ScalarType}}, lurow, lcolst, ucolst, rperm, cperm []int, b, x []{{.ScalarType}}) error {
+func usolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, b, x []complex128) error {
 	if n <= 0 {
 		return fmt.Errorf("usolve called with nonpositive n=%v", n)
 	}
@@ -82,7 +85,7 @@ func usolve(n int, lu []{{.ScalarType}}, lurow, lcolst, ucolst, rperm, cperm []i
 // Output parameter:
 //   x    Solution, as a dense n-vector.
 //   error 0 if successful, 1 otherwise
-func utsolve(n int, lu []{{.ScalarType}}, lurow, lcolst, ucolst, rperm, cperm []int, b, x []{{.ScalarType}}) error {
+func utsolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, b, x []complex128) error {
 	if n <= 0 {
 		return fmt.Errorf("utsolve called with nonpositive n=%v", n)
 	}

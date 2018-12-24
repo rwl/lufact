@@ -29,7 +29,7 @@ var (
 		"lucomp",
 		"lucopy",
 		"ludfs",
-		"lufact",
+		//"lufact",
 		"maxmatch",
 		"usolve",
 	}
@@ -42,8 +42,12 @@ type GPData struct {
 	ScalarType string
 }
 
-func (GPData) Date() string {
-	return now.Format("Mon Jan _2 2006")
+func (GPData) Header() string {
+	d := now.Format("Mon Jan _2 2006")
+	return `// Code generated on ` + d + `. DO NOT EDIT.
+
+// Copyright 1988 John Gilbert and Tim Peierls
+// All rights reserved.`
 }
 
 func execute() error {
@@ -55,7 +59,7 @@ func execute() error {
 		}
 		for _, t := range []GPData{
 			{Package: "gpd", ScalarType: "float64"},
-			//{Package: "gpz", ScalarType: "complex128"},
+			{Package: "gpz", ScalarType: "complex128"},
 		} {
 			buf := new(bytes.Buffer)
 

@@ -1,6 +1,9 @@
-{{.Header}}
+// Code generated on Mon Dec 24 2018. DO NOT EDIT.
 
-package {{.Package}}
+// Copyright 1988 John Gilbert and Tim Peierls
+// All rights reserved.
+
+package gpz
 
 // lucomp computes one column of L and U in the dense vector.
 //
@@ -36,7 +39,7 @@ package {{.Package}}
 //
 //           Both dense and found are indexed according to the row
 //           numbering of A, not PA.
-func lucomp(jcol int, lastlu *int, lu []{{.ScalarType}}, lurow, lcolst, ucolst, rperm, cperm []int, dense []{{.ScalarType}}, found, pattern []int) {
+func lucomp(jcol int, lastlu *int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, dense []complex128, found, pattern []int) {
 	// Local variables:
 	//   nzuptr                pointer to current nonzero PtU(krow,jcol).
 	//   nzuend, nnzu, nzuind  used to compute nzuptr.

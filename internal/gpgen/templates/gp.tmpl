@@ -1,7 +1,4 @@
-// Code generated on {{.Date}}. DO NOT EDIT.
-
-// Copyright 1988 John Gilbert and Tim Peierls
-// All rights reserved.
+{{.Header}}
 
 package {{.Package}}
 
@@ -111,9 +108,9 @@ func ifill(a []int, la, ival int) {
 
 var rnd int
 
-func dordstat(n, k int, A []{{.ScalarType}}, kth *{{.ScalarType}}, info *int) {
+func dordstat(n, k int, A []float64, kth *float64, info *int) {
 	var i, j int
-	var x {{.ScalarType}}
+	var x float64
 
 	if k < 0 || k > n {
 		*info = -1

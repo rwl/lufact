@@ -3,7 +3,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gpd
+package gpz
 
 import "fmt"
 
@@ -56,7 +56,7 @@ import "fmt"
 //     These rows also are numbered according to A, not PA.
 //   lcolst(jcol) is the index of the first nonzero in col j of L.
 //   lastlu is the index of the last non-fill nonzero in col j of L.
-func ludfs(jcol int, a []float64, arow, acolst []int, lastlu *int, lurow, lcolst, ucolst, rperm, cperm []int, dense []float64, found, parent, child []int) error {
+func ludfs(jcol int, a []complex128, arow, acolst []int, lastlu *int, lurow, lcolst, ucolst, rperm, cperm []int, dense []complex128, found, parent, child []int) error {
 	// Local variables:
 	//   nzast, nzaend   range of indices in arow for column jcol of A.
 	//   nzaptr          pointer to current position in arow.

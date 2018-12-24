@@ -1,7 +1,4 @@
-// Code generated on {{.Date}}. DO NOT EDIT.
-
-// Copyright 1988 John Gilbert and Tim Peierls
-// All rights reserved.
+{{.Header}}
 
 package {{.Package}}
 
@@ -221,7 +218,7 @@ func Factor(nA int, rowind, colptr []int, nzA []{{.ScalarType}}, optFuncs ...Opt
 
 	// Allocate work arrays.
 	rwork := make([]{{.ScalarType}}, nrow)
-	twork := make([]{{.ScalarType}}, nrow)
+	twork := make([]float64, nrow)
 	found := make([]int, nrow)
 	child := make([]int, nrow)
 	parent := make([]int, nrow)

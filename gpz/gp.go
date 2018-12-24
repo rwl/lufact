@@ -3,7 +3,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gpd
+package gpz
 
 const off int = 1
 
@@ -24,8 +24,8 @@ const off int = 1
 // Work parameter:
 //   rwork                      Real array of length n; holds intermediate
 //                              solution.
-func lusolv(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, x []float64) error {
-	rwork := make([]float64, n)
+func lusolv(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, x []complex128) error {
+	rwork := make([]complex128, n)
 	err := lsolve(n, lu, lurow, lcolst, ucolst, rperm, cperm, x, rwork)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func cntrow(arow []int, lasta int, rowcnt []int) {
 // of iteration (which makes a difference if the arrays overlap) is
 // controlled by MODE, which is set false for backward displacement and
 // true for forward displacement.
-func rcopy(a, b []float64, la int, mode bool) {
+func rcopy(a, b []complex128, la int, mode bool) {
 	if mode {
 		goto l200
 	}
@@ -95,7 +95,7 @@ func icopy(a, b []int, la int, mode bool) {
 }
 
 // rfill fills a real*8 array with a given value.
-func rfill(a []float64, la int, rval float64) {
+func rfill(a []complex128, la int, rval complex128) {
 	for i := 1; i <= la; i++ {
 		a[i-off] = rval
 	}
@@ -178,8 +178,8 @@ l900:
 	return
 }
 
-// requiv tests if two []float64 arrays start at the same address.
-func requiv(a, b []float64) bool {
+// requiv tests if two []complex128 arrays start at the same address.
+func requiv(a, b []complex128) bool {
 	requiv := false
 	temp := a[1-off]
 	a[1-off] = 0.0
