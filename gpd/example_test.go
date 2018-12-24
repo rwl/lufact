@@ -1,12 +1,12 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gp_test
+package gpd_test
 
 import (
 	"fmt"
 
-	"github.com/rwlincoln/lufact"
+	"github.com/rwlincoln/lufact/gpd"
 )
 
 // ExampleFactor factorizes a 10x10 matrix, given a column permutation
@@ -36,12 +36,12 @@ func ExampleFactor() {
 	)
 	colPerm = []int{6, 5, 2, 4, 1, 9, 7, 8, 0, 3}
 
-	lu, err := gp.Factor(n, arow, acolst, a, gp.ColPerm(colPerm))
+	lu, err := gpd.Factor(n, arow, acolst, a, gpd.ColPerm(colPerm))
 	if err != nil {
 		panic(err)
 	}
 
-	err = gp.Solve(lu, [][]float64{b}, true)
+	err = gpd.Solve(lu, [][]float64{b}, true)
 	if err != nil {
 		panic(err)
 	}

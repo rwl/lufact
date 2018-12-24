@@ -1,0 +1,478 @@
+// Code generated on Sun Dec 23 2018. DO NOT EDIT.
+
+// Copyright 1988 John Gilbert and Tim Peierls
+// All rights reserved.
+
+package gpd
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"math"
+)
+
+// Logger is a writer used for logging messages.
+var Logger io.Writer
+
+type pivotPolicy int
+
+const (
+	noDiagonalElement pivotPolicy = -1
+	noPivoting        pivotPolicy = 0
+	partialPivoting   pivotPolicy = 1
+	thresholdPivoting pivotPolicy = 2
+)
+
+type options struct {
+	pivotPolicy    pivotPolicy
+	pivotThreshold float64
+	dropThreshold  float64
+	colFillRatio   float64
+	fillRatio      float64
+	expandRatio    float64
+	colPerm        []int
+}
+
+func (opts *options) String() string {
+	return fmt.Sprintf("piv pol=%d piv_thr=%v drop_thr=%v col_fill_rt=%v",
+		opts.pivotPolicy, opts.pivotThreshold, opts.dropThreshold, opts.colFillRatio)
+}
+
+type OptFunc func(*options) error
+
+// WithoutPivoting disables pivoting.
+func WithoutPivoting() OptFunc {
+	return func(opts *options) error {
+		opts.pivotPolicy = noPivoting
+		return nil
+	}
+}
+
+// PartialPivoting enables partial pivoting. Enabled by default.
+// pivotThreshold is the fraction of max pivot candidate
+// acceptable for pivoting. Default value is 1.
+func PartialPivoting(pivotThreshold float64) OptFunc {
+	return func(opts *options) error {
+		opts.pivotPolicy = partialPivoting
+		opts.pivotThreshold = pivotThreshold
+		return nil
+	}
+}
+
+// ThresholdPivoting enables threshold pivoting.
+func ThresholdPivoting( /*dropThreshold float64*/ ) OptFunc {
+	return func(opts *options) error {
+		opts.pivotPolicy = thresholdPivoting
+		//opts.dropThreshold = dropThreshold
+		//if dropThreshold == 0 {
+		//	if Logger != nil {
+		//		fmt.Fprint(Logger, "zero drop threshold, pivoting disabled")
+		//	}
+		//	opts.pivotPolicy = noPivoting
+		//}
+		return nil
+	}
+}
+
+// DropThreshold sets drop tolerance.
+//
+// For each major step of the algorithm, the pivot is chosen to
+// be a nonzero below the diagonal in the current column of A
+// with the most nonzeros to the right in its row, with absolute
+// value at least dropThreshold*maxpiv, where maxpiv is the
+// largest absolute value below the diagonal in the current column.
+// Note that if dropThreshold <= 0.0, then the pivot is chosen
+// purely on the basis of row sparsity. Also, if
+// dropThreshold >= 1.0, then the pivoting is effectively partial
+// pivoting with ties broken on the basis of sparsity.
+func DropThreshold(dropThreshold float64) OptFunc {
+	return func(opts *options) error {
+		opts.dropThreshold = dropThreshold
+		return nil
+	}
+}
+
+// ColFillRatio sets the column fill ratio. If < 0 the column
+// fill ratio is not limited. Default value is -1.
+func ColFillRatio(colFillRatio float64) OptFunc {
+	return func(opts *options) error {
+		opts.colFillRatio = colFillRatio
+		return nil
+	}
+}
+
+// FillRatio sets the ratio of the initial LU size to NNZ.
+// Default value is 4.
+func FillRatio(fillRatio float64) OptFunc {
+	return func(opts *options) error {
+		opts.fillRatio = fillRatio
+		return nil
+	}
+}
+
+// ExpandRatio sets the ratio for LU size growth.
+// Default value is 1.2.
+func ExpandRatio(expandRatio float64) OptFunc {
+	return func(opts *options) error {
+		if expandRatio <= 1 {
+			return fmt.Errorf("expand ratio (%v) must be > 1", expandRatio)
+		}
+		opts.expandRatio = expandRatio
+		return nil
+	}
+}
+
+// ColPerm sets the column permutation vector.
+// If nil natural ordering will be used.
+func ColPerm(colPerm []int) OptFunc {
+	return func(opts *options) error {
+		opts.colPerm = colPerm
+		return nil
+	}
+}
+
+// LU is a lower-upper numeric factorization.
+type LU struct {
+	luSize   int
+	luNZ     []float64
+	luRowInd []int
+	lColPtr  []int
+	uColPtr  []int
+
+	rowPerm []int
+	colPerm []int
+
+	nA int
+}
+
+// Factor performs sparse LU factorization with partial pivoting.
+//
+// Given a matrix A in sparse format by columns, it performs an LU
+// factorization, with partial or threshold pivoting, if desired. The
+// factorization is PA = LU, where L and U are triangular. P, L, and U
+// are returned.  This subroutine uses the Coleman-Gilbert-Peierls
+// algorithm, in which total time is O(nonzero multiplications).
+func Factor(nA int, rowind, colptr []int, nzA []float64, optFuncs ...OptFunc) (*LU, error) {
+	var (
+		nrow = nA
+		ncol = nA
+		nnzA = len(nzA)
+	)
+	if nnzA > nA*nA {
+		return nil, fmt.Errorf("nnz (%v) must be < n*n (%v)", nnzA, nA*nA)
+	}
+	if len(rowind) != len(nzA) {
+		return nil, fmt.Errorf("len rowind (%v) must be nnz (%v)", len(rowind), len(nzA))
+	}
+	if len(colptr) != ncol+1 {
+		return nil, fmt.Errorf("len colptr (%v) must be ncol+1 (%v)", len(colptr), ncol+1)
+	}
+
+	opts := &options{
+		pivotPolicy:    partialPivoting,
+		pivotThreshold: 1,
+		dropThreshold:  0,  // do not drop
+		colFillRatio:   -1, // do not limit column fill ratio
+		fillRatio:      4,
+		expandRatio:    1.2,
+	}
+	for _, optionFunc := range optFuncs {
+		err := optionFunc(opts)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if Logger != nil {
+		fmt.Fprintf(Logger, "%v\n", opts)
+	}
+
+	// If a column permutation is specified, it must be a length ncol permutation.
+	if opts.colPerm != nil {
+		if len(opts.colPerm) != ncol {
+			//*info = -1
+			//goto free_and_exit
+			return nil, fmt.Errorf("column permutation (%v) must be a length ncol %v", len(opts.colPerm), ncol)
+		}
+		for _, v := range opts.colPerm {
+			if v < 0 || v >= ncol {
+				return nil, fmt.Errorf("column permutation %v out of range [0,%d)", v, ncol)
+			}
+		}
+	}
+
+	// Convert the descriptor to 1-base if necessary.
+	colptrA := make([]int, nA+1)
+	rowindA := make([]int, nnzA)
+	//if baseA == 0 {
+	for jcol := 0; jcol < nA+1; jcol++ {
+		colptrA[jcol] = colptr[jcol] + 1
+	}
+	for jcol := 0; jcol < nnzA; jcol++ {
+		rowindA[jcol] = rowind[jcol] + 1
+	}
+	//descA.base = 1
+	//baseA = 1
+	//}
+
+	// Allocate work arrays.
+	rwork := make([]float64, nrow)
+	twork := make([]float64, nrow)
+	found := make([]int, nrow)
+	child := make([]int, nrow)
+	parent := make([]int, nrow)
+	pattern := make([]int, nrow)
+
+	// Create lu structure.
+	luSize := int(float64(nnzA) * opts.fillRatio)
+	lu := &LU{
+		luSize:   luSize,
+		luNZ:     make([]float64, luSize),
+		luRowInd: make([]int, luSize),
+		uColPtr:  make([]int, ncol+1),
+		lColPtr:  make([]int, ncol),
+		rowPerm:  make([]int, nrow),
+		colPerm:  make([]int, ncol),
+		nA:       nA,
+	}
+
+	// Compute max matching. We use elements of the lu structure
+	// for all the temporary arrays needed.
+
+	rmatch, cmatch, err := maxmatch(nrow, ncol, colptrA, rowindA,
+		lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, lu.luRowInd)
+	if err != nil {
+		return nil, err
+	}
+
+	for jcol := 0; jcol < ncol; jcol++ {
+		if cmatch[jcol] == 0 {
+			if Logger != nil {
+				fmt.Fprintf(Logger, "warning: perfect matching not found\n")
+			}
+			break
+		}
+	}
+
+	//for jcol := 0; jcol < ncol; jcol++ {
+	//	cmatch[jcol] = jcol + 1
+	//	rmatch[jcol] = jcol + 1
+	//}
+
+	// Initialize useful values and zero out the dense vectors.
+	// If we are threshold pivoting, get row counts.
+	var lastlu = 0
+
+	localPivotPolicy := opts.pivotPolicy
+	//lasta := colptrA[ncol] - 1
+	lu.uColPtr[0] = 1
+
+	//ifill(pattern, nrow, 0)
+	//ifill(found, nrow, 0)
+	//rfill(rwork, nrow, 0)
+	ifill(lu.rowPerm, nrow, 0)
+
+	if opts.colPerm == nil {
+		for jcol := 0; jcol < ncol; jcol++ {
+			lu.colPerm[jcol] = jcol + 1
+		}
+	} else {
+		//fmt.Printf("UserColPermBase = %d\n", userColPermBase)
+		for jcol := 0; jcol < ncol; jcol++ {
+			//lu.colPerm[jcol] = userColPerm[jcol] + (1 - userColPermBase)
+			lu.colPerm[jcol] = opts.colPerm[jcol] + 1
+		}
+	}
+
+	// Compute one column at a time.
+	for jcol := 1; jcol <= ncol; jcol++ {
+		// Mark pointer to new column, ensure it is large enough.
+		if lastlu+nrow >= lu.luSize {
+			newSize := int(float64(lu.luSize) * opts.expandRatio)
+
+			if Logger != nil {
+				fmt.Fprintf(Logger, "expanding LU to %d nonzeros\n", newSize)
+			}
+
+			luNZ := make([]float64, newSize)
+			copy(luNZ, lu.luNZ)
+			lu.luNZ = luNZ
+			//lu.luNZ = append(lu.luNZ, make([]float64, newSize-lu.luSize)...)
+
+			luRowInd := make([]int, newSize)
+			copy(luRowInd, lu.luRowInd)
+			lu.luRowInd = luRowInd
+			//lu.luRowInd = append(lu.luRowInd, make([]int, newSize-lu.luSize)...)
+
+			lu.luSize = newSize
+		}
+
+		// Set up nonzero pattern.
+		var origRow, thisCol int
+		{
+			jjj := lu.colPerm[jcol-1]
+			for i := colptrA[jjj-1]; i < colptrA[jjj]; i++ {
+				pattern[rowindA[i-1]-1] = 1
+			}
+
+			thisCol = lu.colPerm[jcol-1]
+			origRow = cmatch[thisCol-1]
+
+			pattern[origRow-1] = 2
+
+			if lu.rowPerm[origRow-1] != 0 {
+				return nil, fmt.Errorf("pivot row from max-matching already used")
+			}
+			// pattern[ thisCol - 1 ] = 2
+		}
+
+		// Depth-first search from each above-diagonal nonzero of column
+		// jcol of A, allocating storage for column jcol of U in
+		// topological order and also for the non-fill part of column
+		// jcol of L.
+		err := ludfs(jcol, nzA, rowindA, colptrA, &lastlu,
+			lu.luRowInd, lu.lColPtr, lu.uColPtr,
+			lu.rowPerm, lu.colPerm, rwork, found, parent, child)
+		if err != nil {
+			return nil, err
+		}
+
+		// Compute the values of column jcol of L and U in the dense
+		// vector, allocating storage for fill in L as necessary.
+
+		lucomp(jcol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
+			lu.rowPerm, lu.colPerm, rwork, found, pattern)
+
+		//if rwork[origRow-1] == 0.0 {
+		//	fmt.Printf("Warning: Matching to a zero\n")
+		//
+		//	for i := colptrA[jcol-1]; i < colptrA[jcol]; i++ {
+		//		fmt.Printf("(%d,%v) ", rowindA[i-1], nzA[i-1])
+		//		fmt.Printf(". origRow=%d\n", origRow)
+		//	}
+		//}
+
+		// Copy the dense vector into the sparse data structure, find the
+		// diagonal element (pivoting if specified), and divide the
+		// column of L by it.
+		nzCountLimit := int(opts.colFillRatio * (float64(colptrA[thisCol] - colptrA[thisCol-1] + 1)))
+
+		zpivot, err := lucopy(localPivotPolicy, opts.pivotThreshold, opts.dropThreshold,
+			nzCountLimit, jcol, ncol, &lastlu, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr,
+			lu.rowPerm, lu.colPerm, rwork, pattern, twork)
+		if err != nil {
+			return nil, err
+		}
+		if zpivot == -1 {
+			return nil, fmt.Errorf("lucopy: jcol=%v", jcol)
+		}
+
+		{
+			jjj := lu.colPerm[jcol-1]
+			for i := colptrA[jjj-1]; i < colptrA[jjj]; i++ {
+				pattern[rowindA[i-1]-1] = 0
+			}
+
+			pattern[origRow-1] = 0
+
+			pivtRow := zpivot
+			othrCol := rmatch[pivtRow-1]
+
+			cmatch[thisCol-1] = pivtRow
+			cmatch[othrCol-1] = origRow
+			rmatch[origRow-1] = othrCol
+			rmatch[pivtRow-1] = thisCol
+
+			//pattern[thisCol - 1] = 0
+		}
+
+		// If there are no diagonal elements after this column, change the pivot mode.
+		if jcol == nrow {
+			localPivotPolicy = noDiagonalElement
+		}
+	}
+
+	// Fill in the zero entries of the permutation vector, and renumber the
+	// rows so the data structure represents L and U, not PtL and PtU.
+	jcol := ncol + 1
+	for i := 0; i < nrow; i++ {
+		if lu.rowPerm[i] == 0 {
+			lu.rowPerm[i] = jcol
+			jcol = jcol + 1
+		}
+	}
+
+	for i := 0; i < lastlu; i++ {
+		lu.luRowInd[i] = lu.rowPerm[lu.luRowInd[i]-1]
+	}
+
+	//fmt.Printf("rperm:\n[")
+	//for i := 0; i < ncol; i++ {
+	//	fmt.Printf("%d ", lu.rowPerm[i])
+	//}
+	//fmt.Printf("]\n")
+	//
+	//fmt.Printf("cperm:\n[")
+	//for i := 0; i < ncol; i++ {
+	//	fmt.Printf("%d ", lu.ColPerm[i])
+	//}
+	//fmt.Printf("]\n")
+
+	if Logger != nil {
+		var ujj float64
+		var minujj = math.Inf(1)
+
+		for jcol := 1; jcol <= ncol; jcol++ {
+			ujj = math.Abs(lu.luNZ[lu.lColPtr[jcol-1]-2])
+			if ujj < minujj {
+				minujj = ujj
+			}
+		}
+
+		fmt.Fprintf(Logger, "last = %v, min = %v\n", ujj, minujj)
+	}
+
+	return lu, nil
+}
+
+// Solve Ax=b for one or more right-hand-sides given the numeric
+// factorization of A from Factor.
+func Solve(lu *LU, rhs [][]float64, trans bool) error {
+	if lu == nil {
+		return errors.New("lu must not be nil")
+	}
+	n := lu.nA
+	if len(rhs) == 0 {
+		return fmt.Errorf("one or more rhs must be specified")
+	}
+	for i, b := range rhs {
+		if len(b) != n {
+			return fmt.Errorf("len b[%d] (%v) must equal ord(A) (%v)", i, len(b), n)
+		}
+	}
+	work := make([]float64, n)
+
+	for _, b := range rhs {
+		if !trans {
+			err := lsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, work)
+			if err != nil {
+				return fmt.Errorf("lsolve: %v", err)
+			}
+			err = usolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, work, b)
+			if err != nil {
+				return fmt.Errorf("usolve: %v", err)
+			}
+		} else {
+			err := utsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, b, work)
+			if err != nil {
+				return fmt.Errorf("utsolve: %v", err)
+			}
+			err = ltsolve(n, lu.luNZ, lu.luRowInd, lu.lColPtr, lu.uColPtr, lu.rowPerm, lu.colPerm, work, b)
+			if err != nil {
+				return fmt.Errorf("ltsolve: %v", err)
+			}
+		}
+	}
+	return nil
+}

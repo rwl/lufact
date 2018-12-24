@@ -1,7 +1,7 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gp_test
+package gpd_test
 
 func lhr01() (n int, rowind, colst []int, nzA []float64) {
 	n = 1477

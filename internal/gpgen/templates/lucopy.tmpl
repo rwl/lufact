@@ -1,7 +1,9 @@
+// Code generated on {{.Date}}. DO NOT EDIT.
+
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gp
+package {{.Package}}
 
 import (
 	"fmt"
@@ -47,8 +49,8 @@ import (
 // Output variable:
 //   zpivot                 > 0 for success (pivot row), -1 for zero pivot element.
 func lucopy(pivot pivotPolicy, pthresh, dthresh float64, nzcount int,
-	jcol, ncol int, lastlu *int, lu []float64, lurow, lcolst, ucolst []int,
-	rperm, cperm []int, dense []float64, pattern []int, twork []float64) (int, error) {
+	jcol, ncol int, lastlu *int, lu []{{.ScalarType}}, lurow, lcolst, ucolst []int,
+	rperm, cperm []int, dense []{{.ScalarType}}, pattern []int, twork []{{.ScalarType}}) (int, error) {
 	// Local variables:
 	//   nzptr       Index into lurow of current nonzero.
 	//   nzst, nzend Loop bounds for nzptr.

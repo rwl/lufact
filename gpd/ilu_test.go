@@ -1,15 +1,14 @@
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gp_test
+package gpd_test
 
 import (
+	"math"
 	"os"
 	"testing"
 
-	"math"
-
-	"github.com/rwlincoln/lufact"
+	gp "github.com/rwlincoln/lufact/gpd"
 )
 
 func TestMain(m *testing.M) {

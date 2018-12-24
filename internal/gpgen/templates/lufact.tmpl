@@ -1,7 +1,9 @@
+// Code generated on {{.Date}}. DO NOT EDIT.
+
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gp
+package {{.Package}}
 
 import "fmt"
 
@@ -87,14 +89,14 @@ import "fmt"
 //   overwr  set to .true. if A and LU as given are equivalent arrays
 //   xa      starting index of nonzeros in A/AROW (initially 1)
 //   zpivot  set to .true. if a zero pivot is found by lucopy()
-func lufact(pivot pivotPolicy, pivotThreshold, dropThreshold float64, nrow, ncol int, a []float64, arow []int, acolst []int,
-	maxlu int, lastlu *int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int) error {
+func lufact(pivot pivotPolicy, pivotThreshold, dropThreshold float64, nrow, ncol int, a []{{.ScalarType}}, arow []int, acolst []int,
+	maxlu int, lastlu *int, lu []{{.ScalarType}}, lurow, lcolst, ucolst, rperm, cperm []int) error {
 
 	var nzCount int
 
 	// Allocate work arrays.
-	rwork := make([]float64, nrow)
-	twork := make([]float64, nrow)
+	rwork := make([]{{.ScalarType}}, nrow)
+	twork := make([]{{.ScalarType}}, nrow)
 	found := make([]int, nrow)
 	child := make([]int, nrow)
 	parent := make([]int, nrow)

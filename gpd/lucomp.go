@@ -1,7 +1,9 @@
+// Code generated on Sun Dec 23 2018. DO NOT EDIT.
+
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
 
-package gp
+package gpd
 
 // lucomp computes one column of L and U in the dense vector.
 //
