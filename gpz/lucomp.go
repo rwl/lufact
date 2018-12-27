@@ -60,29 +60,29 @@ func lucomp(jcol int, lastlu *int, lu []complex128, lurow, lcolst, ucolst, rperm
 	if nnzu != 0 {
 		for nzuind := 1; nzuind <= nnzu; nzuind++ {
 			nzuptr := nzuend - nzuind
-			krow := lurow[nzuptr-off]
-			kcol := rperm[krow-off]
-			ukj := dense[krow-off]
-			//if pattern[rperm[krow-off]-off] == 0 {
+			krow := lurow[nzuptr-off] - 1
+			kcol := rperm[krow] - 1
+			ukj := dense[krow]
+			//if pattern[rperm[krow]-off] == 0 {
 			//	ukj = 0
 			//}
 
 			// For each irow with PtL(irow,kcol) != 0, update PtL(irow,jcol) or PtU(irow,jcol)
 
-			nzlst := lcolst[kcol-off]
-			nzlend := ucolst[kcol+1-off] - 1
+			nzlst := lcolst[kcol]
+			nzlend := ucolst[kcol+1] - 1
 			if nzlend < nzlst {
 				continue
 			}
-			for nzlptr := nzlst; nzlptr <= nzlend; nzlptr++ {
-				irow := lurow[nzlptr-off]
-				dense[irow-off] -= ukj * lu[nzlptr-off]
+			for nzlptr := nzlst - 1; nzlptr < nzlend; nzlptr++ {
+				irow := lurow[nzlptr] - 1
+				dense[irow] -= ukj * lu[nzlptr]
 
 				// If this is a new nonzero in L, allocate storage for it.
-				if found[irow-off] != jcol {
-					found[irow-off] = jcol
-					*lastlu = *lastlu + 1
-					lurow[*lastlu-off] = irow
+				if found[irow] != jcol {
+					found[irow] = jcol
+					lurow[*lastlu] = irow + 1
+					*lastlu += 1
 				}
 			}
 		}

@@ -57,47 +57,33 @@ import "fmt"
 //   lcolst(jcol) is the index of the first nonzero in col j of L.
 //   lastlu is the index of the last non-fill nonzero in col j of L.
 func ludfs(jcol int, a []complex128, arow, acolst []int, lastlu *int, lurow, lcolst, ucolst, rperm, cperm []int, dense []complex128, found, parent, child []int) error {
-	// Local variables:
-	//   nzast, nzaend   range of indices in arow for column jcol of A.
-	//   nzaptr          pointer to current position in arow.
-	//   krow            current vertex in depth-first search (numbered
-	//                   according to A, not PA).
-	//   nextk           possible next vertex in depth-first search.
-	//   chdend          next index after last child of current vertex.
-	//   chdptr          index of current child of current vertex
-	var nextk, chdend, chdptr int
-
 	// Depth-first search through columns of L from each nonzero of
 	// column jcol of A that is above the diagonal in PA.
 
 	// For each krow such that A(krow,jcol) is nonzero do...
 
+	// Range of indices in arow for column jcol of A.
 	nzast := acolst[cperm[jcol-off]-off]
-	nzaend := acolst[cperm[jcol-off]+1-off]
+	nzaend := acolst[cperm[jcol-off]] //+1-off]
 
 	if nzaend < nzast {
 		return fmt.Errorf("ludfs, negative length for column %v of A. nzast=%v nzend=%v", jcol, nzast, nzaend)
 	}
 	nzaend = nzaend - 1
-	for nzaptr := nzast; nzaptr <= nzaend; nzaptr++ {
-		krow := arow[nzaptr-off]
+	for nzaptr := nzast - 1; nzaptr < nzaend; nzaptr++ { // pointer to current position in arow (zero based)
+		// Current vertex in depth-first search (numbered according to A, not PA) (zero based).
+		krow := arow[nzaptr] - 1
 
 		// Copy A(krow,jcol) into the dense vector. If above diagonal in
 		// PA, start a depth-first search in column rperm(krow) of L.
 
-		dense[krow-off] = a[nzaptr-off]
-		if rperm[krow-off] == 0 {
-			goto l500
+		dense[krow] = a[nzaptr]
+		if rperm[krow] == 0 || found[krow] == jcol || dense[krow] == 0 {
+			continue
 		}
-		if found[krow-off] == jcol {
-			goto l500
-		}
-		if dense[krow-off] == 0.0 {
-			goto l500
-		}
-		parent[krow-off] = 0
-		found[krow-off] = jcol
-		chdptr = lcolst[rperm[krow-off]-off]
+		parent[krow] = 0
+		found[krow] = jcol
+		chdptr := lcolst[rperm[krow]-off] // Index of current child of current vertex.
 
 		// The main depth-first search loop starts here.
 		// repeat
@@ -107,48 +93,40 @@ func ludfs(jcol int, a []complex128, arow, acolst []int, lastlu *int, lurow, lco
 		// until a step back leads to 0
 	l100:
 		// Look for an unfound child of krow.
-		chdend = ucolst[rperm[krow-off]+1-off]
+		chdend := ucolst[rperm[krow]] // Next index after last child of current vertex.
 
 	l200:
-		if chdptr >= chdend {
-			goto l400
-		}
-		nextk = lurow[chdptr-off]
-		chdptr = chdptr + 1
-		if rperm[nextk-off] == 0 {
-			goto l200
-		}
-		if found[nextk-off] == jcol {
-			goto l200
-		}
+		if chdptr < chdend {
+			// Possible next vertex in depth-first search (zero based).
+			nextk := lurow[chdptr-off] - 1
+			chdptr = chdptr + 1
+			if rperm[nextk] == 0 {
+				goto l200
+			}
+			if found[nextk] == jcol {
+				goto l200
+			}
+			// Take a step forward.
 
-		// Take a step forward.
-
-		//l300:
-		child[krow-off] = chdptr
-		parent[nextk-off] = krow
-		krow = nextk
-		found[krow-off] = jcol
-		chdptr = lcolst[rperm[krow-off]-off]
-		goto l100
-
+			//l300:
+			child[krow] = chdptr
+			parent[nextk] = krow + 1
+			krow = nextk
+			found[krow] = jcol
+			chdptr = lcolst[rperm[krow]-off]
+			goto l100
+		}
 		// Take a step back.
 
 		// Allocate space for U(rperm(k),jcol) = PtU(krow,jcol) in the sparse data structure.
-
-	l400:
 		*lastlu = *lastlu + 1
-		lurow[*lastlu-off] = krow
-		krow = parent[krow-off]
-		if krow == 0 {
-			goto l500
+		lurow[*lastlu-off] = krow + 1
+		krow = parent[krow] - 1
+		if krow >= 0 {
+			chdptr = child[krow]
+			goto l100
 		}
-		chdptr = child[krow-off]
-		goto l100
-
 		// The main depth-first search loop ends here.
-	l500:
-		continue
 	}
 	// Close off column jcol of U and allocate space for the non-fill
 	// entries of column jcol of L.
@@ -156,14 +134,13 @@ func ludfs(jcol int, a []complex128, arow, acolst []int, lastlu *int, lurow, lco
 	// division at the end of the major step.
 
 	lcolst[jcol-off] = *lastlu + 1
-	for nzaptr := nzast; nzaptr <= nzaend; nzaptr++ {
-		krow := arow[nzaptr-off]
-		if rperm[krow-off] != 0 {
-			continue
+	for nzaptr := nzast - 1; nzaptr < nzaend; nzaptr++ {
+		krow := arow[nzaptr]
+		if rperm[krow-off] == 0 {
+			found[krow-off] = jcol
+			*lastlu += 1
+			lurow[*lastlu-off] = krow
 		}
-		found[krow-off] = jcol
-		*lastlu = *lastlu + 1
-		lurow[*lastlu-off] = krow
 	}
 
 	return nil
