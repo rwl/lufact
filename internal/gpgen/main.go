@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
-	"time"
 )
 
 var (
@@ -33,8 +32,6 @@ var (
 		"maxmatch",
 		"usolve",
 	}
-
-	now = time.Now()
 )
 
 type GPData struct {
@@ -43,8 +40,7 @@ type GPData struct {
 }
 
 func (GPData) Header() string {
-	d := now.Format("Mon Jan _2 2006")
-	return `// Code generated on ` + d + `. DO NOT EDIT.
+	return `// Code generated with gpgen. DO NOT EDIT.
 
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.`

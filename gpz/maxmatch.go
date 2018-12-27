@@ -1,4 +1,4 @@
-// Code generated on Mon Dec 24 2018. DO NOT EDIT.
+// Code generated with gpgen. DO NOT EDIT.
 
 // Copyright 1988 John Gilbert and Tim Peierls
 // All rights reserved.
