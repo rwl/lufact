@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	gp "github.com/rwlincoln/lufact/gpd"
+	gp "github.com/rwl/lufact/gpd"
 )
 
 func TestMain(m *testing.M) {

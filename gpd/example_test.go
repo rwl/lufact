@@ -6,7 +6,7 @@ package gpd_test
 import (
 	"fmt"
 
-	"github.com/rwlincoln/lufact/gpd"
+	"github.com/rwl/lufact/gpd"
 )
 
 // ExampleFactor factorizes a 10x10 matrix, given a column permutation

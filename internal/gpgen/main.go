@@ -15,8 +15,8 @@ import (
 
 var (
 	tmplDir = filepath.Join(os.Getenv("GOPATH"), "src",
-		"github.com", "rwlincoln", "lufact", "internal", "gpgen", "templates")
-	outDir = filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "rwlincoln", "lufact")
+		"github.com", "rwl", "lufact", "internal", "gpgen", "templates")
+	outDir = filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "rwl", "lufact")
 
 	formatOutput = flag.Bool("fmt", true, "format generated files")
 
