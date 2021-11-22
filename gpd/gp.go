@@ -62,18 +62,14 @@ func cntrow(arow []int, lasta int, rowcnt []int) {
 // true for forward displacement.
 func rcopy(a, b []float64, la int, mode bool) {
 	if mode {
-		goto l200
+		for i := la; i >= 1; i-- {
+			b[i-off] = a[i-off]
+		}
+	} else {
+		for i := 1; i <= la; i++ {
+			b[i-off] = a[i-off]
+		}
 	}
-	for i := 1; i <= la; i++ {
-		b[i-off] = a[i-off]
-	}
-	return
-
-l200:
-	for i := la; i >= 1; i-- {
-		b[i-off] = a[i-off]
-	}
-	return
 }
 
 // icopy copies an integer array A to another array B.
@@ -123,56 +119,51 @@ func dordstat(n, k int, A []float64, kth *float64, info *int) {
 	p := 1
 	r := n
 
-l100:
+	for {
+		if p == r {
+			break
+		}
 
-	if p == r {
-		goto l900
+		if r-p >= 8 {
+			rnd = (1366*rnd + 150889) % 714025
+			q := p + (rnd % (r - p + 1))
+
+			tmp := A[p-off]
+			A[p-off] = A[q-off]
+			A[q-off] = tmp
+		}
+
+		x = A[p-off]
+		i = p - 1
+		j = r + 1
+
+		for {
+			j = j - 1
+			for A[j-off] > x {
+				j = j - 1
+			}
+
+			i = i + 1
+			for A[i-off] < x {
+				i = i + 1
+			}
+
+			if i < j {
+				tmp := A[i-off]
+				A[i-off] = A[j-off]
+				A[j-off] = tmp
+				continue
+			}
+
+			if j < k {
+				p = j + 1
+			} else {
+				r = j
+			}
+			break
+		}
 	}
 
-	if r-p >= 8 {
-		rnd = (1366*rnd + 150889) % 714025
-		q := p + (rnd % (r - p + 1))
-
-		tmp := A[p-off]
-		A[p-off] = A[q-off]
-		A[q-off] = tmp
-	}
-
-	x = A[p-off]
-	i = p - 1
-	j = r + 1
-
-l200:
-	_ = 0
-
-l210:
-	j = j - 1
-	if A[j-off] > x {
-		goto l210
-	}
-
-l220:
-	i = i + 1
-	if A[i-off] < x {
-		goto l220
-	}
-
-	if i < j {
-		tmp := A[i-off]
-		A[i-off] = A[j-off]
-		A[j-off] = tmp
-		goto l200
-	}
-
-	if j < k {
-		p = j + 1
-	} else {
-		r = j
-	}
-
-	goto l100
-
-l900:
 	*kth = A[p-off]
 	*info = 0
 	return
@@ -180,18 +171,17 @@ l900:
 
 // requiv tests if two []float64 arrays start at the same address.
 func requiv(a, b []float64) bool {
-	requiv := false
 	temp := a[1-off]
 	a[1-off] = 0.0
 	if b[1-off] != 0.0 {
-		goto l100
+		a[1-off] = temp
+		return false
 	}
 	a[1-off] = 1.0
 	if b[1-off] != 1.0 {
-		goto l100
+		a[1-off] = temp
+		return false
 	}
-	requiv = true
-l100:
 	a[1-off] = temp
-	return requiv
+	return true
 }

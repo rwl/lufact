@@ -92,41 +92,49 @@ func ludfs(jcol int, a []float64, arow, acolst []int, lastlu *int, lurow, lcolst
 		//   else step back
 		// until a step back leads to 0
 	l100:
-		// Look for an unfound child of krow.
-		chdend := ucolst[rperm[krow]] // Next index after last child of current vertex.
+		for {
+			// Look for an unfound child of krow.
+			chdend := ucolst[rperm[krow]] // Next index after last child of current vertex.
 
-	l200:
-		if chdptr < chdend {
-			// Possible next vertex in depth-first search (zero based).
-			nextk := lurow[chdptr-off] - 1
-			chdptr = chdptr + 1
-			if rperm[nextk] == 0 {
-				goto l200
+		l200:
+			for {
+				if chdptr < chdend {
+					// Possible next vertex in depth-first search (zero based).
+					nextk := lurow[chdptr-off] - 1
+					chdptr = chdptr + 1
+					if rperm[nextk] == 0 {
+						continue l200
+					}
+					if found[nextk] == jcol {
+						continue l200
+					}
+					// Take a step forward.
+
+					//l300:
+					child[krow] = chdptr
+					parent[nextk] = krow + 1
+					krow = nextk
+					found[krow] = jcol
+					chdptr = lcolst[rperm[krow]-off]
+					//goto l100
+					continue l100
+				}
+				break
 			}
-			if found[nextk] == jcol {
-				goto l200
+			// Take a step back.
+
+			// Allocate space for U(rperm(k),jcol) = PtU(krow,jcol) in the sparse data structure.
+			*lastlu = *lastlu + 1
+			lurow[*lastlu-off] = krow + 1
+			krow = parent[krow] - 1
+			if krow >= 0 {
+				chdptr = child[krow]
+				//goto l100
+				continue l100
 			}
-			// Take a step forward.
-
-			//l300:
-			child[krow] = chdptr
-			parent[nextk] = krow + 1
-			krow = nextk
-			found[krow] = jcol
-			chdptr = lcolst[rperm[krow]-off]
-			goto l100
+			// The main depth-first search loop ends here.
+			break
 		}
-		// Take a step back.
-
-		// Allocate space for U(rperm(k),jcol) = PtU(krow,jcol) in the sparse data structure.
-		*lastlu = *lastlu + 1
-		lurow[*lastlu-off] = krow + 1
-		krow = parent[krow] - 1
-		if krow >= 0 {
-			chdptr = child[krow]
-			goto l100
-		}
-		// The main depth-first search loop ends here.
 	}
 	// Close off column jcol of U and allocate space for the non-fill
 	// entries of column jcol of L.

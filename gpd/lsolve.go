@@ -60,7 +60,7 @@ func lsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, x
 	for i := 1; i <= n; i++ {
 		x[rperm[i-off]-off] = b[i-off]
 	}
-
+l150:
 	for j := 1; j <= n; j++ {
 		nzst := lcolst[j-off]
 		nzend := ucolst[j+1-off] - 1
@@ -68,7 +68,7 @@ func lsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, x
 			return fmt.Errorf("lsolve, inconsistent column of L: j=%v nzst=%v, nzend=%v", j, nzst, nzend)
 		}
 		if nzst > nzend {
-			goto l150
+			continue l150
 		}
 		for nzptr := nzst; nzptr <= nzend; nzptr++ {
 			i := lurow[nzptr-off]
@@ -77,7 +77,6 @@ func lsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, x
 			}
 			x[i-off] -= lu[nzptr-off] * x[j-off]
 		}
-	l150:
 	}
 
 	return nil
@@ -133,7 +132,7 @@ func ltsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, 
 	for i := 1; i <= n; i++ {
 		x[i-off] = b[i-off]
 	}
-
+l150:
 	for j := n; j >= 1; j-- {
 		nzst := lcolst[j-off]
 		nzend := ucolst[j+1-off] - 1
@@ -141,7 +140,7 @@ func ltsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, 
 			return fmt.Errorf("ltsolve, inconsistent column of L: j=%v, nzst=%v, nzend=%v", j, nzst, nzend)
 		}
 		if nzst > nzend {
-			goto l150
+			continue l150
 		}
 		for nzptr := nzst; nzptr <= nzend; nzptr++ {
 			i := lurow[nzptr-off]
@@ -150,7 +149,6 @@ func ltsolve(n int, lu []float64, lurow, lcolst, ucolst, rperm, cperm []int, b, 
 			}
 			x[j-off] -= lu[nzptr-off] * x[i-off]
 		}
-	l150:
 	}
 
 	for i := 1; i <= n; i++ {

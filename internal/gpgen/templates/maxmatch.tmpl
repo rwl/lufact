@@ -66,103 +66,104 @@ func maxmatch(nrows, ncols int, colstr, rowind, prevcl, prevrw, marker, tryrow, 
 		// Main loop begins here. Each time through, try to find a
 		// cheap assignment from node col.
 	l100:
-		nextrw = nxtchp[col-off]
-		lastrw = colstr[col+1-off] - 1
-
-		if nextrw > 0 {
-			for xrow := nextrw; xrow <= lastrw; xrow++ {
-				row = rowind[xrow-off]
-				if rowset[row-off] == 0 {
-					goto l400
-				}
-			}
-
-			// Mark column when all adjacent rows have been
-			// considered for cheap assignment.
-			nxtchp[col-off] = -1
-		}
-
-		// Each time through, take a step forward if possible, or
-		// backtrack if not .  Quit when backtracking takes us back
-		// to the beginning of the search.
-
-		tryrow[col-off] = colstr[col-off]
-		nextrw = tryrow[col-off]
-		//lastrw = colstr [col+1-off] - 1
-
-		if lastrw >= nextrw {
-			for xrow := nextrw; xrow <= lastrw; xrow++ {
-				// next line inserted by Alex Pothen, July 1990
-				// ii  = xrow
-				row = rowind[xrow-off]
-				if marker[row-off] < nodec {
-
-					// Row is unvisited yet for this pass.
-					// Take a forward step.
-
-					tryrow[col-off] = xrow + 1
-					marker[row-off] = nodec
-					nxtcol := rowset[row-off]
-
-					if nxtcol < 0 {
-						err = fmt.Errorf("maxmatch: search reached a forbidden column")
-						return
-					} else if nxtcol == col {
-						err = fmt.Errorf("maxmatch: search followed a matching edge")
-						return
-					} else if nxtcol > 0 {
-
-						// The forward step led to a matched row
-						// try to extend augmenting path from
-						// the column matched by this row.
-
-						prevcl[nxtcol-off] = col
-						prevrw[nxtcol-off] = row
-						tryrow[nxtcol-off] = colstr[nxtcol-off]
-						col = nxtcol
-						goto l100
-
-					} else {
-						// Unmatched row
-						goto l400
+		for {
+			nextrw = nxtchp[col-off]
+			lastrw = colstr[col+1-off] - 1
+		l400:
+			for {
+				if nextrw > 0 {
+					for xrow := nextrw; xrow <= lastrw; xrow++ {
+						row = rowind[xrow-off]
+						if rowset[row-off] == 0 {
+							break l400
+						}
 					}
 
+					// Mark column when all adjacent rows have been
+					// considered for cheap assignment.
+					nxtchp[col-off] = -1
 				}
-				//l300: continue
+
+				// Each time through, take a step forward if possible, or
+				// backtrack if not .  Quit when backtracking takes us back
+				// to the beginning of the search.
+
+				tryrow[col-off] = colstr[col-off]
+				nextrw = tryrow[col-off]
+				//lastrw = colstr [col+1-off] - 1
+
+				if lastrw >= nextrw {
+					for xrow := nextrw; xrow <= lastrw; xrow++ {
+						// next line inserted by Alex Pothen, July 1990
+						// ii  = xrow
+						row = rowind[xrow-off]
+						if marker[row-off] < nodec {
+
+							// Row is unvisited yet for this pass.
+							// Take a forward step.
+
+							tryrow[col-off] = xrow + 1
+							marker[row-off] = nodec
+							nxtcol := rowset[row-off]
+
+							if nxtcol < 0 {
+								err = fmt.Errorf("maxmatch: search reached a forbidden column")
+								return
+							} else if nxtcol == col {
+								err = fmt.Errorf("maxmatch: search followed a matching edge")
+								return
+							} else if nxtcol > 0 {
+
+								// The forward step led to a matched row
+								// try to extend augmenting path from
+								// the column matched by this row.
+
+								prevcl[nxtcol-off] = col
+								prevrw[nxtcol-off] = row
+								tryrow[nxtcol-off] = colstr[nxtcol-off]
+								col = nxtcol
+								continue l100
+
+							} else {
+								// Unmatched row
+								break l400
+							}
+
+						}
+						//l300: continue
+					}
+				}
+
+				// No forward step -- backtrack.
+				// If we backtrack all the way, the search is done
+
+				col = prevcl[col-off]
+				if col > 0 {
+					continue l100
+				} else {
+					break l100
+				}
+				break
 			}
-		}
 
-		// No forward step -- backtrack.
-		// If we backtrack all the way, the search is done
+			// Update the matching by alternating the matching
+			// edge backward toward the root.
+			rowset[row-off] = col
+			prow = prevrw[col-off]
+			pcol = prevcl[col-off]
 
-		col = prevcl[col-off]
-		if col > 0 {
-			goto l100
-		} else {
-			goto l600
-		}
-
-		// Update the matching by alternating the matching
-		// edge backward toward the root.
-	l400:
-		rowset[row-off] = col
-		prow = prevrw[col-off]
-		pcol = prevcl[col-off]
-
-	l500:
-		if pcol > 0 {
-			if rowset[prow-off] != col {
-				err = fmt.Errorf("maxmatch: pointer toward root disagrees with matching. prevcl[%v]=%v but colset[%v]=%v", col, row, row, rowset[row-off])
-				return
+			for pcol > 0 {
+				if rowset[prow-off] != col {
+					err = fmt.Errorf("maxmatch: pointer toward root disagrees with matching. prevcl[%v]=%v but colset[%v]=%v", col, row, row, rowset[row-off])
+					return
+				}
+				rowset[prow-off] = pcol
+				col = pcol
+				prow = prevrw[pcol-off]
+				pcol = prevcl[pcol-off]
 			}
-			rowset[prow-off] = pcol
-			col = pcol
-			prow = prevrw[pcol-off]
-			pcol = prevcl[pcol-off]
-			goto l500
+			break
 		}
-	l600:
-		continue
 	}
 
 	// Compute the matching from the view of column nodes.

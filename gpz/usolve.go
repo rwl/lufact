@@ -30,7 +30,7 @@ func usolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, b
 	for i := 1; i <= n; i++ {
 		x[i-off] = b[i-off]
 	}
-
+l150:
 	for jj := 1; jj <= n; jj++ {
 		j := n + 1 - jj
 		nzst := ucolst[j-off]
@@ -47,7 +47,7 @@ func usolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, b
 		x[j-off] = x[j-off] / lu[nzend-off]
 		nzend = nzend - 1
 		if nzst > nzend {
-			goto l150
+			continue l150
 		}
 		for nzptr := nzst; nzptr <= nzend; nzptr++ {
 			i := lurow[nzptr-off]
@@ -56,7 +56,6 @@ func usolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, b
 			}
 			x[i-off] -= lu[nzptr-off] * x[j-off]
 		}
-	l150:
 	}
 
 	for i := 1; i <= n; i++ {
@@ -101,7 +100,7 @@ func utsolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, 
 	for i := 1; i <= n; i++ {
 		x[i-off] = b[cperm[i-off]-off]
 	}
-
+l150:
 	for j := 1; j <= n; j++ {
 		nzst := ucolst[j-off]
 		nzend := lcolst[j-off] - 1
@@ -116,7 +115,8 @@ func utsolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, 
 		}
 		nzend = nzend - 1
 		if nzst > nzend {
-			goto l150
+			x[j-off] = x[j-off] / lu[nzend+1-off]
+			continue l150
 		}
 		for nzptr := nzst; nzptr <= nzend; nzptr++ {
 			i := lurow[nzptr-off]
@@ -125,7 +125,6 @@ func utsolve(n int, lu []complex128, lurow, lcolst, ucolst, rperm, cperm []int, 
 			}
 			x[j-off] -= lu[nzptr-off] * x[i-off]
 		}
-	l150:
 		x[j-off] = x[j-off] / lu[nzend+1-off]
 	}
 	//l200:
